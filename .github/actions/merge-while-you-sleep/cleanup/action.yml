@@ -1,0 +1,20 @@
+name: merge-while-you-sleep-cleanup
+description: 終わりの確認のジョブ。ほかのジョブが、引き継ぎも提出の完了もせずに終わったとき、人に引き継ぐ
+author: shumatsumonobu
+
+inputs:
+  github_token:
+    description: Issue へのコメント、ラベルの操作、PR と実行の読み取りに使う
+    required: false
+    default: ${{ github.token }}
+  needs:
+    description: toJSON(needs)
+    required: true
+  target:
+    description: どちらのワークフローの終わりの確認か（draft、run）
+    required: false
+    default: run
+
+runs:
+  using: node24
+  main: cleanup.mjs

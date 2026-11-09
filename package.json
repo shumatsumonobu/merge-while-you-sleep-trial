@@ -1,0 +1,13 @@
+{
+  "name": "merge-while-you-sleep-trial",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "merge-while-you-sleep を導入した試験用のリポジトリ",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

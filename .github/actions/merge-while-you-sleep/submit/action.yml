@@ -1,0 +1,57 @@
+name: merge-while-you-sleep-submit
+description: 提出のジョブ。bundle を確かめ直して push し、PR を作り、自動マージを予約して CI を待つ。App の秘密鍵を扱い、Claude Code も対象プロジェクトのコードも実行しない
+author: shumatsumonobu
+
+inputs:
+  app_client_id:
+    description: GitHub App の client ID（token を渡すときは不要）
+    required: false
+  app_private_key:
+    description: GitHub App の秘密鍵（token を渡すときは不要）
+    required: false
+  token:
+    description: 個人用アクセストークンで動かすとき
+    required: false
+  github_token:
+    description: GITHUB_TOKEN で済む操作（Issue へのコメント、CI の結果の読み取り）に使う
+    required: false
+    default: ${{ github.token }}
+  merge_method:
+    description: マージの方法（squash、merge、rebase）
+    required: false
+    default: squash
+  base_commit:
+    description: 開始の確認のジョブの出力（土台のコミット）
+    required: true
+  approval:
+    description: 開始の確認のジョブの出力（承認の記録）
+    required: true
+  resume:
+    description: 開始の確認のジョブの出力（続きから進めるときの PR）
+    required: false
+  work_report:
+    description: 作業のジョブの出力（作業のレポートの要約）
+    required: true
+  bundle_head:
+    description: 作業のジョブの出力（bundle の先頭の SHA）
+    required: true
+  resume_pr_head:
+    description: 作業のジョブの出力（続きから進めるときに、作業を始めた時点の PR の先頭）
+    required: false
+  automerge:
+    description: 作業のジョブの出力（自動マージを予約してよいか）
+    required: false
+    default: "false"
+  bundle_path:
+    description: actions/download-artifact で受け取った bundle のパス
+    required: false
+
+outputs:
+  done:
+    description: このジョブが、引き継ぐか終えるかを済ませたか（終わりの確認が読む）
+  pr_number:
+    description: 作った、または更新した PR の番号
+
+runs:
+  using: node24
+  main: submit.mjs

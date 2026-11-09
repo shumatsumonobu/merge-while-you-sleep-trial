@@ -1,0 +1,42 @@
+name: merge-while-you-sleep-preflight
+description: 開始の確認のジョブ。権限、設定、承認を確かめ、承認を記録し、土台のコミットを決める。App の秘密鍵を扱い、Claude Code も対象プロジェクトのコードも実行しない
+author: shumatsumonobu
+
+inputs:
+  app_client_id:
+    description: GitHub App の client ID（token を渡すときは不要）
+    required: false
+  app_private_key:
+    description: GitHub App の秘密鍵（token を渡すときは不要）
+    required: false
+  token:
+    description: 個人用アクセストークンで動かすとき
+    required: false
+  github_token:
+    description: GITHUB_TOKEN で済む操作（権限の確かめ、Issue へのコメント、下書きの実行と artifact の読み取り）に使う
+    required: false
+    default: ${{ github.token }}
+  merge_method:
+    description: マージの方法（squash、merge、rebase）。リポジトリの設定で許されているかを確かめる
+    required: false
+    default: squash
+  draft_workflow:
+    description: 下書き用のワークフローのファイル名（下書きのコメントを確かめるため）
+    required: false
+    default: merge-while-you-sleep-draft.yml
+
+outputs:
+  proceed:
+    description: 開始の確認が「進めてよい」で終わったか
+  done:
+    description: このジョブが、引き継ぐか終えるかを済ませたか（終わりの確認が読む）
+  base_commit:
+    description: 土台のコミット
+  approval:
+    description: 承認の記録（JSON）
+  resume:
+    description: 続きから進めるときの PR（JSON）。最初からのときは空
+
+runs:
+  using: node24
+  main: preflight.mjs

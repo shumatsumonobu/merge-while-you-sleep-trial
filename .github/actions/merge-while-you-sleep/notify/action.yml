@@ -1,0 +1,17 @@
+name: merge-while-you-sleep-notify
+description: 順番待ちの通知のジョブ。起動ラベルが付いたら、すぐ「順番待ちに入った」とコメントする
+author: shumatsumonobu
+
+inputs:
+  github_token:
+    description: Issue へのコメントと、順番待ちの実行の数を数えるのに使う
+    required: false
+    default: ${{ github.token }}
+  run_workflow:
+    description: 実行用のワークフローのファイル名（順番待ちの数を数えるため）
+    required: false
+    default: merge-while-you-sleep-run.yml
+
+runs:
+  using: node24
+  main: notify.mjs

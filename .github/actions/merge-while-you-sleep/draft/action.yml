@@ -1,0 +1,38 @@
+name: merge-while-you-sleep-draft
+description: 下書きのジョブ。Claude Code がコードを読み、完了条件の案と質問を Issue にコメントする
+author: shumatsumonobu
+
+inputs:
+  claude_code_oauth_token:
+    description: サブスク（Pro / Max）の OAuth トークン。手元で claude setup-token を実行して発行する
+    required: true
+  github_token:
+    description: draft.mjs のプロセスだけが持ち、Claude Code には渡さない
+    required: false
+    default: ${{ github.token }}
+  model_draft:
+    description: 下書きのモデル
+    required: false
+    default: opus
+  max_draft_questions:
+    description: 下書きの質問の上限
+    required: false
+    default: "5"
+  max_draft_minutes:
+    description: 下書きのジョブの時間の上限（分）
+    required: false
+    default: "20"
+  max_draft_cost_usd:
+    description: 1回の下書きのコストの上限（Claude Code の推定、USD）
+    required: false
+    default: "2"
+
+outputs:
+  done:
+    description: このジョブが、引き継ぐか終えるかを済ませたか（終わりの確認が読む）
+  artifact_dir:
+    description: 下書きのコメントの ID と本文のハッシュを置いたディレクトリ
+
+runs:
+  using: node24
+  main: draft.mjs

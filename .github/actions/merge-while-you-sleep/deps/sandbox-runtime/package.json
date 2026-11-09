@@ -1,0 +1,8 @@
+{
+  "name": "merge-while-you-sleep-sandbox-runtime",
+  "private": true,
+  "description": "Claude Code の sandbox の seccomp フィルタ。版をここで固定し、action が npm ci --ignore-scripts で入れる",
+  "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.81"
+  }
+}

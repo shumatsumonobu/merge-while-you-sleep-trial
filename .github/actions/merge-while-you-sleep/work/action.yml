@@ -1,0 +1,126 @@
+name: merge-while-you-sleep-work
+description: 作業のジョブ。計画、テスト作成、実装、ゲート、レビュー、修正を進め、変更を bundle にする。PR 用トークンは持たない
+author: shumatsumonobu
+
+inputs:
+  claude_code_oauth_token:
+    description: サブスク（Pro / Max）の OAuth トークン。手元で claude setup-token を実行して発行する
+    required: true
+  github_token:
+    description: work.mjs のプロセスだけが持ち、Claude Code とゲートのコマンドには渡さない
+    required: false
+    default: ${{ github.token }}
+  base_commit:
+    description: 開始の確認のジョブの出力（土台のコミット）
+    required: true
+  approval:
+    description: 開始の確認のジョブの出力（承認の記録）
+    required: true
+  resume:
+    description: 開始の確認のジョブの出力（続きから進めるときの PR）
+    required: false
+  test_command:
+    description: テストのコマンド
+    required: true
+  lint_command:
+    description: lint のコマンド。渡さなければ実行しない
+    required: false
+  typecheck_command:
+    description: 型検査のコマンド。渡さなければ実行しない
+    required: false
+  mutation_command:
+    description: ミューテーションテストのコマンド。渡さなければ実行しない
+    required: false
+  test_file_command:
+    description: テストのファイルを引数に取るテストのコマンド。渡すと、赤先行を新しいテストのファイルごとに確かめる
+    required: false
+  network_allow_domains:
+    description: Claude Code の sandbox で通信を許すドメイン（改行かカンマで区切る）
+    required: false
+  gate_network:
+    description: ゲートの中で通信を許すか
+    required: false
+    default: "false"
+  pass_env:
+    description: ゲートと Claude Code に追加で渡す環境変数の名前。Secrets の入った変数を書かない
+    required: false
+  workspace_keep:
+    description: 作業の最初にあった git の管理の外のファイルのうち、ゲートと Claude Code に読み取りだけで見せるディレクトリの名前
+    required: false
+    default: node_modules,.venv,venv,vendor
+  gate_read_paths:
+    description: ゲートと Claude Code の sandbox に追加で見せるディレクトリ
+    required: false
+  allow_tools:
+    description: Claude Code に追加で許す組み込みのツール。sandbox で動く工程にだけ足す
+    required: false
+  model_plan:
+    description: 計画のモデル
+    required: false
+    default: opus
+  model_write_tests:
+    description: テスト作成のモデル
+    required: false
+    default: opus
+  model_implement:
+    description: 実装のモデル
+    required: false
+    default: sonnet
+  model_fix:
+    description: 修正のモデル
+    required: false
+    default: sonnet
+  model_resolve_conflicts:
+    description: 競合の解消のモデル
+    required: false
+    default: sonnet
+  model_review:
+    description: レビューのモデル
+    required: false
+    default: opus
+  max_rounds:
+    description: レビュー → 修正の往復の上限
+    required: false
+    default: "3"
+  max_same_finding:
+    description: 同じ ID の指摘が続けて「残っている」回数の上限
+    required: false
+    default: "2"
+  max_gate_failures:
+    description: 1回の往復の中での、ゲートの失敗 → 修正の上限
+    required: false
+    default: "3"
+  max_test_returns:
+    description: テスト作成に戻す上限
+    required: false
+    default: "1"
+  max_cost_usd:
+    description: 1回の実行のコストの上限（Claude Code の推定、USD）
+    required: false
+    default: "15"
+  max_work_minutes:
+    description: 作業のジョブの時間の上限（分）。ジョブの timeout-minutes より短くする
+    required: false
+    default: "120"
+
+outputs:
+  done:
+    description: このジョブが、引き継ぐか終えるかを済ませたか（終わりの確認が読む）
+  submit:
+    description: 提出のジョブに渡す変更があるか
+  bundle_dir:
+    description: bundle を置いたディレクトリ（RUNNER_TEMP の下）
+  bundle_head:
+    description: bundle の先頭の SHA
+  resume_pr_head:
+    description: 続きから進めるときに、作業を始めた時点の PR の先頭
+  automerge:
+    description: 自動マージを予約してよいか
+  work_report:
+    description: 作業のレポートの要約（JSON）
+
+runs:
+  using: node24
+  main: work.mjs
+  post: work.mjs
+  post-if: always()
