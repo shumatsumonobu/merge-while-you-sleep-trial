@@ -1,0 +1,160 @@
+# 実行用のワークフロー。.github/workflows/merge-while-you-sleep-run.yml にコピーする
+#
+# ジョブは4つ: 開始の確認 → 作業 → 提出、終わりの確認（DESIGN.md のワークフローのファイルとジョブ）
+# merge-while-you-sleep の @ のあとは、使う版のコミットの SHA に置き換える（供給元を固定する）
+# 作業のジョブの「プロジェクトごとの準備」と、テストのコマンドを、自分のプロジェクトに合わせて書き換える
+
+name: merge-while-you-sleep-run
+
+on:
+  issues:
+    types: [opened, labeled]
+
+# 準備の step のキャッシュを書かない ── 作業ディレクトリの中身を、ほかのワークフローに読ませない
+cache-mode: read
+
+permissions: {}
+
+env:
+  MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL: "${{ vars.MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL || 'merge-while-you-sleep: draft' }}"
+  MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL: "${{ vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run' }}"
+  MERGE_WHILE_YOU_SLEEP_ESCALATION_LABEL: "${{ vars.MERGE_WHILE_YOU_SLEEP_ESCALATION_LABEL || 'merge-while-you-sleep: needs-human' }}"
+  MERGE_WHILE_YOU_SLEEP_ALLOW_PATHS: ${{ vars.MERGE_WHILE_YOU_SLEEP_ALLOW_PATHS }}
+  MERGE_WHILE_YOU_SLEEP_DENY_PATHS: ${{ vars.MERGE_WHILE_YOU_SLEEP_DENY_PATHS }}
+  MERGE_WHILE_YOU_SLEEP_DENY_PATTERNS: ${{ vars.MERGE_WHILE_YOU_SLEEP_DENY_PATTERNS }}
+  MERGE_WHILE_YOU_SLEEP_TEST_PATHS: ${{ vars.MERGE_WHILE_YOU_SLEEP_TEST_PATHS }}
+
+concurrency:
+  # 起動ラベルのイベントで、外の人のものでなければ共通の名前。ほかは実行ごとに分ける
+  group: >-
+    merge-while-you-sleep-run-${{
+      (((github.event.action == 'labeled' && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run'))
+        || (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run')))
+       && !(github.event.sender.login == github.event.issue.user.login
+            && !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)))
+      && 'shared' || github.run_id
+    }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    if: >-
+      github.event.sender.type == 'User'
+      && ((github.event.action == 'labeled' && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run'))
+          || (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      actions: read
+    outputs:
+      proceed: ${{ steps.preflight.outputs.proceed }}
+      done: ${{ steps.preflight.outputs.done }}
+      base_commit: ${{ steps.preflight.outputs.base_commit }}
+      approval: ${{ steps.preflight.outputs.approval }}
+      resume: ${{ steps.preflight.outputs.resume }}
+    steps:
+      - id: preflight
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/preflight@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          app_client_id: ${{ vars.APP_CLIENT_ID }}
+          app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+  work:
+    needs: [preflight]
+    if: needs.preflight.outputs.proceed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: read
+    outputs:
+      done: ${{ steps.work.outputs.done }}
+      submit: ${{ steps.work.outputs.submit }}
+      bundle_head: ${{ steps.work.outputs.bundle_head }}
+      resume_pr_head: ${{ steps.work.outputs.resume_pr_head }}
+      automerge: ${{ steps.work.outputs.automerge }}
+      work_report: ${{ steps.work.outputs.work_report }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.base_commit }}
+          persist-credentials: false
+          fetch-depth: 0 # 続きから進めるときに、PR のブランチと土台のコミットの共通の履歴が要る
+      # ---- プロジェクトごとの準備（例: Node.js）。作業ディレクトリに鍵のファイルを置かない ----
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+      # ---- ここまで ----
+      - id: work
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/work@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          test_command: npm test
+          base_commit: ${{ needs.preflight.outputs.base_commit }}
+          approval: ${{ needs.preflight.outputs.approval }}
+          resume: ${{ needs.preflight.outputs.resume }}
+      - if: steps.work.outputs.submit == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: merge-while-you-sleep-bundle
+          path: ${{ steps.work.outputs.bundle_dir }}
+          retention-days: 1
+
+  submit:
+    needs: [preflight, work]
+    if: needs.work.outputs.submit == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      checks: read
+      statuses: read
+      actions: read
+    outputs:
+      done: ${{ steps.submit.outputs.done }}
+      pr_number: ${{ steps.submit.outputs.pr_number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.base_commit }}
+          persist-credentials: false
+          fetch-depth: 0 # bundle の前提のコミットと、続きから進めるときの PR のブランチの履歴が要る
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: merge-while-you-sleep-bundle
+          path: ${{ runner.temp }}/merge-while-you-sleep-bundle
+      - id: submit
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/submit@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          app_client_id: ${{ vars.APP_CLIENT_ID }}
+          app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          base_commit: ${{ needs.preflight.outputs.base_commit }}
+          approval: ${{ needs.preflight.outputs.approval }}
+          resume: ${{ needs.preflight.outputs.resume }}
+          work_report: ${{ needs.work.outputs.work_report }}
+          bundle_head: ${{ needs.work.outputs.bundle_head }}
+          resume_pr_head: ${{ needs.work.outputs.resume_pr_head }}
+          automerge: ${{ needs.work.outputs.automerge }}
+          bundle_path: ${{ runner.temp }}/merge-while-you-sleep-bundle/work.bundle
+
+  cleanup:
+    needs: [preflight, work, submit]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      pull-requests: read
+      actions: read
+    steps:
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          target: run
+          needs: ${{ toJSON(needs) }}

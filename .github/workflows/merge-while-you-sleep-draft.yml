@@ -1,0 +1,103 @@
+# 下書き用のワークフロー。.github/workflows/merge-while-you-sleep-draft.yml にコピーする
+#
+# ジョブは3つ: 下書き、順番待ちの通知、終わりの確認（DESIGN.md のワークフローのファイルとジョブ）
+# merge-while-you-sleep の @ のあとは、使う版のコミットの SHA に置き換える（供給元を固定する）
+
+name: merge-while-you-sleep-draft
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+# 準備の step のキャッシュを書かない ── 作業ディレクトリの中身を、ほかのワークフローに読ませない
+cache-mode: read
+
+permissions: {}
+
+env:
+  MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL: "${{ vars.MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL || 'merge-while-you-sleep: draft' }}"
+  MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL: "${{ vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run' }}"
+  MERGE_WHILE_YOU_SLEEP_ESCALATION_LABEL: "${{ vars.MERGE_WHILE_YOU_SLEEP_ESCALATION_LABEL || 'merge-while-you-sleep: needs-human' }}"
+
+concurrency:
+  # 同じ Issue の中だけ順番。起動ラベルのイベントと、外の人が起こしたイベントは、実行ごとに分ける
+  group: >-
+    merge-while-you-sleep-draft-${{ github.event.issue.number }}-${{
+      (
+        (github.event_name == 'issues'
+          && ((github.event.action == 'labeled' && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run'))
+              || (github.event.sender.login == github.event.issue.user.login
+                  && !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))))
+        || (github.event_name == 'issue_comment'
+          && !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      ) && github.run_id || 'shared'
+    }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    if: >-
+      github.event.sender.type == 'User'
+      && !github.event.issue.pull_request
+      && !contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run')
+      && (
+        (github.event_name == 'issues' && github.event.action == 'labeled'
+          && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL || 'merge-while-you-sleep: draft'))
+        || (github.event_name == 'issues' && github.event.action == 'opened'
+          && contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL || 'merge-while-you-sleep: draft'))
+        || (github.event_name == 'issue_comment'
+          && contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL || 'merge-while-you-sleep: draft'))
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      done: ${{ steps.draft.outputs.done }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: draft
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/draft@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      - if: steps.draft.outputs.artifact_dir != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: merge-while-you-sleep-draft
+          path: ${{ steps.draft.outputs.artifact_dir }}
+          retention-days: 30
+
+  notify:
+    if: >-
+      github.event_name == 'issues'
+      && github.event.sender.type == 'User'
+      && ((github.event.action == 'labeled' && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run'))
+          || (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/notify@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          run_workflow: merge-while-you-sleep-run.yml
+
+  cleanup:
+    needs: [draft]
+    if: always() && needs.draft.result != 'skipped' && needs.draft.outputs.done != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        with:
+          target: draft
+          needs: ${{ toJSON(needs) }}

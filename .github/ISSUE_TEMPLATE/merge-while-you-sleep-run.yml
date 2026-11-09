@@ -1,0 +1,26 @@
+# 完了条件を人が書く Issue のテンプレート。.github/ISSUE_TEMPLATE/merge-while-you-sleep-run.yml にコピーする
+# 起動ラベルを自動で付ける ── 書き込み権限のある人が自分で書いて出すと、それが承認を兼ね、下書きを飛ばして実行する
+# ラベルの名前を変数 MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL で変えたら、labels も同じ名前に直す。欄の見出し「完了条件」は変えない（開始の確認が読む）
+name: 完了条件まで書いて実行する
+description: 完了条件を自分で書く。出すとすぐ実行の順番待ちに入る（書き込み権限のある人だけ）
+labels: ["merge-while-you-sleep: run"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: やりたいこと
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: 完了条件
+      description: 1行に1項目。どれもテストで確かめられる形で書く（入力、操作、期待する結果）
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: 今回やらないこと
+    validations:
+      required: false

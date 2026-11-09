@@ -1,0 +1,13 @@
+# 下書き用の Issue のテンプレート。.github/ISSUE_TEMPLATE/merge-while-you-sleep-draft.yml にコピーする
+# 下書きラベルを自動で付ける。ラベルの名前を変数 MERGE_WHILE_YOU_SLEEP_DRAFT_LABEL で変えたら、labels も同じ名前に直す
+name: やりたいことを書く（完了条件は Claude Code が下書きする）
+description: やりたいことを書くと、Claude Code が完了条件の案と質問をコメントする。案でよければ起動ラベルを付けて承認する
+labels: ["merge-while-you-sleep: draft"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: やりたいこと
+      description: 何を変えたいか、なぜ変えたいか。分かっていれば、困っている場面や期待する結果も
+    validations:
+      required: true
