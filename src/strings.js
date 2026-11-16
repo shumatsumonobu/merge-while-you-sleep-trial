@@ -24,3 +24,14 @@ export function truncate(s, n) {
   if (s.length <= n) return s;
   return s.slice(0, n - 1) + "…";
 }
+
+/**
+ * 先頭の1文字が ASCII の a〜z のときだけ大文字にする
+ * @param {string} s
+ * @returns {string}
+ */
+export function capitalize(s) {
+  const c = s.charCodeAt(0);
+  if (c >= 97 && c <= 122) return String.fromCharCode(c - 32) + s.slice(1);
+  return s;
+}
