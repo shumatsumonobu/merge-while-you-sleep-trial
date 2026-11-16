@@ -330,12 +330,30 @@ export async function runClaude(env, { claudePath, args, prompt, cwd, timeoutMs,
   const r = { code, err, timedOut };
   if (leftovers) return { output: null, cost: parsed?.total_cost_usd ?? 0, failure: new Stop("guard_tripped", "Claude Code の呼び出しのあとに、止められないプロセスが残った") };
   const cost = Number(parsed?.total_cost_usd ?? 0) || 0;
+  const usage = usageOf(parsed);
   if (code !== 0 || !parsed || parsed.is_error) {
     log(`Claude Code が失敗した: ${failureDiagnostics(r, parsed, [env.CLAUDE_CODE_OAUTH_TOKEN])}`);
-    return { output: null, cost, failure: classifyClaudeFailure(r, parsed) || new Stop("undecidable", `Claude Code が終了コード ${code} で終わった`) };
+    return { output: null, cost, usage, failure: classifyClaudeFailure(r, parsed) || new Stop("undecidable", `Claude Code が終了コード ${code} で終わった`) };
   }
-  if (parsed.structured_output === undefined) return { output: null, cost, failure: new Stop("undecidable", "レポートが返らなかった") };
-  return { output: parsed.structured_output, cost, failure: null };
+  if (parsed.structured_output === undefined) return { output: null, cost, usage, failure: new Stop("undecidable", "レポートが返らなかった") };
+  return { output: parsed.structured_output, cost, usage, failure: null };
+}
+
+/** Claude Code の結果の JSON から、トークンの量と往復の数を取り出す（ログに出す。実装のあとで測ること） */
+export function usageOf(parsed) {
+  const u = parsed?.usage || {};
+  const n = (v) => Number(v) || 0;
+  return {
+    input: n(u.input_tokens), output: n(u.output_tokens),
+    cache_read: n(u.cache_read_input_tokens), cache_write: n(u.cache_creation_input_tokens),
+    turns: n(parsed?.num_turns), ms: n(parsed?.duration_ms),
+  };
+}
+
+/** usageOf の結果を1行にする */
+export function usageText(u) {
+  if (!u) return "トークン 不明";
+  return `トークン 入力 ${u.input}、出力 ${u.output}、キャッシュの読み取り ${u.cache_read}、キャッシュの書き込み ${u.cache_write}。往復 ${u.turns}、${Math.round(u.ms / 1000)} 秒`;
 }
 
 /** 中のプロセスを全部止め、残りが無いことを確かめる。残っていれば true */

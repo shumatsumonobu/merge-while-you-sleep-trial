@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { input, inputNumber, log, mask, runnerTemp, setOutput } from "../shared/actions.mjs";
-import { buildPrompt, buildSettings, claudeEnv, findHelpers, installClaude, runClaude, SCHEMAS, validate } from "../shared/claude.mjs";
+import { buildPrompt, buildSettings, claudeEnv, findHelpers, installClaude, runClaude, SCHEMAS, usageText, validate } from "../shared/claude.mjs";
 import { LIMITS, MODELS } from "../shared/defaults.mjs";
 import { comment, escalate, marker, readMarker, REASONS, Stop } from "../shared/escalation.mjs";
 import { sha256 } from "../shared/git.mjs";
@@ -107,6 +107,7 @@ async function modeDraft() {
     prompt, cwd: ws, timeoutMs: inputNumber("max_draft_minutes", LIMITS.max_draft_minutes) * 60000, callId: 1,
   });
   log(`工程 draft: 終わった（コスト ${r.cost.toFixed(2)} USD）`);
+  log(`工程 draft: ${usageText(r.usage)}`);
   if (r.failure) return draftEscalate(r.failure.reason, r.failure.details);
   if (validate(SCHEMAS.draft, r.output)) return draftEscalate("undecidable", "下書きのレポートがスキーマに合わない");
 

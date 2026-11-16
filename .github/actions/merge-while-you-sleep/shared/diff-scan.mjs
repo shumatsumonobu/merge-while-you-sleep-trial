@@ -11,12 +11,14 @@ export const DEFAULT_DENY_PATTERNS = [
   "stryker disable", "istanbul ignore", "c8 ignore", "noqa", "type: ignore", "# mypy:",
   "pragma: no cover", "pylint: disable", "nolint", "#[allow(", "#![allow(", "#[expect(", "#![expect(",
   "#[mutants::skip]", "cfg_attr(", "pragma: no mutate", "@suppresswarnings",
+  "@donotmutate", "rubocop:disable", "@codecoverageignore", "phpcs:ignore", "phpcs:disable", "@suppress(",
+  "swiftlint:disable", "deno-lint-ignore", "biome-ignore",
 ];
 
 /** 消した行にあれば範囲の外にする書き方 ── 無効化を戻す書き方と、検査を強める書き方 */
 export const DEFAULT_DELETED_PATTERNS = [
   "stryker restore", "eslint-enable", "c8 ignore stop", "pragma: no mutate end", "pylint: enable", "nolintend",
-  "@ts-check", "#![deny(", "#![forbid(",
+  "@ts-check", "#![deny(", "#![forbid(", "rubocop:enable", "phpcs:enable", "swiftlint:enable",
 ];
 
 /** 照合のための正規化: 改行と空白を取り除き、大文字小文字の違いを同じとみなす */

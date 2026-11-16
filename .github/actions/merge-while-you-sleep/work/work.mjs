@@ -10,7 +10,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, re
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getState, input, inputBool, inputNumber, log, mask, runnerTemp, saveState, setOutput, splitList } from "../shared/actions.mjs";
-import { buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, killAllCgroups, runClaude, SCHEMAS, SKILL_HOOKS_VERIFIED, validate } from "../shared/claude.mjs";
+import { buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, killAllCgroups, runClaude, SCHEMAS, SKILL_HOOKS_VERIFIED, usageText, validate } from "../shared/claude.mjs";
 import { LIMITS, MODELS } from "../shared/defaults.mjs";
 import { comment, escalate, marker, REASONS, Stop } from "../shared/escalation.mjs";
 import { diffEntries, fetchRef, makeGit, sha256 } from "../shared/git.mjs";
@@ -305,6 +305,7 @@ async function callStage(ctx, stage, prompt) {
   removeClaudeArtifacts(ctx.ws, ctx.claudeBefore || new Set());
   ctx.state.cost += r.cost || 0;
   log(`工程 ${stage}: 終わった（コスト ${(r.cost || 0).toFixed(2)} USD、合計 ${ctx.state.cost.toFixed(2)} USD）`);
+  log(`工程 ${stage}: ${usageText(r.usage)}`);
   if (r.failure) throw r.failure;
   const err = validate(SCHEMAS[stage], r.output);
   if (err) throw new Stop("undecidable", `工程 ${stage} のレポートがスキーマに合わない`);
