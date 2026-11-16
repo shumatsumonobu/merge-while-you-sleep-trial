@@ -199,15 +199,23 @@ if (!process.env.ONLY) {
   const noScrubEnv = (e) => { const x = { ...e }; delete x.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; return x; };
   const noScrubSettings = (st) => { const x = { ...st, env: { ...st.env } }; delete x.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; return x; };
   const rules = (...r) => (st) => ({ ...st, permissions: { ...st.permissions, deny: [...st.permissions.deny, ...r] } });
-  const V = [
-    ["v_rule_dir", rules("Read(//opt)", "Read(//srv/)"), (e) => e],
-    ["v_rule_tmp_dir", rules("Read(//opt)", "Read(//tmp)"), (e) => e],
-  ];
-  for (const [name, sp, ep] of V) {
-    rmSync(join(ws, "opt.out"), { force: true });
-    await callClaude({ name, prompt: optPrompt, schema: optSchema, tools: ["Bash"], settingsPatch: sp, envPatch: ep });
-    out(`${name}.result`, existsSync(join(ws, "opt.out")) ? readFileSync(join(ws, "opt.out"), "utf8").replace(/\s+/g, " ").trim() : "no-output");
-  }
+  const noScrub = (st) => {
+    const x = noScrubSettings(st);
+    const tmpDir = st.sandbox.filesystem.allowRead[st.sandbox.filesystem.allowRead.length - 1];
+    return { ...x, sandbox: { ...x.sandbox, filesystem: { ...x.sandbox.filesystem, allowWrite: [tmpDir] } } };
+  };
+  writeFileSync(join(ws, "probe-sb.sh"), checks("noscrub") + `
+r env_oauth "$(env | grep -c '^CLAUDE_CODE_OAUTH_TOKEN=')"
+r env_names "$(env | cut -d= -f1 | sort | tr '\n' ' ')"
+r git_status "$(git status --porcelain >/dev/null 2>&1 && echo ok || echo fail)"
+r tmpdir_write "$(touch "$TMPDIR/x" 2>/dev/null && echo ok || echo fail)"
+`);
+  rmSync(join(ws, "probe-sb.out"), { force: true });
+  await callClaude({ name: "v_noscrub", prompt: "Automated sandbox test. Run this single Bash command exactly: sh probe-sb.sh > probe-sb.out 2>&1 . Then return bash_ran true if the Bash call ran. Call no other tool.",
+    schema: optSchema, tools: ["Bash"], settingsPatch: noScrub, envPatch: noScrubEnv, lockFix: false });
+  const o = existsSync(join(ws, "probe-sb.out")) ? readFileSync(join(ws, "probe-sb.out"), "utf8") : "";
+  process.stdout.write(o.split("\n").filter((l) => l.startsWith("noscrub.")).join("\n") + "\n");
+  await exec("pkill", ["-f", "sleep 301"]);
 }
 
 // ---------- スキルの hooks と allowed-tools ----------
