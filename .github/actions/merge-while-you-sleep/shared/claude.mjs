@@ -195,7 +195,9 @@ export function buildPrompt(name, { trusted = [], untrusted = [] }) {
 export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWrite = [], editDeny = [], allowDomains = [], skills = [], tmp }) {
   const deny = [
     "WebFetch", "WebSearch",
-    "Read(//proc/**)", "Read(~/.*)", "Read(~/.*/**)", `Read(/${runnerTemp}/**)`,
+    // ホームの隠しファイルは deny ルールにしない ── sandbox の denyRead に合わさり、既定で見せる ~/.cargo/bin や ~/.rustup の中まで隠す。
+    // ファイルを読むツールは blockReadsOutsideWorkingDirectories が、sandbox の中のコマンドは根の / の denyRead が止める
+    "Read(//proc/**)", `Read(/${runnerTemp}/**)`,
     "Edit(**/.claude/**)", "Edit(**/.mcp.json)", "Edit(**/CLAUDE.md)", "Edit(**/CLAUDE.local.md)", "Edit(**/AGENTS.md)",
     "Edit(**/.github/**)", "Edit(**/.git/**)", "Edit(**/CODEOWNERS)",
     ...editDeny,

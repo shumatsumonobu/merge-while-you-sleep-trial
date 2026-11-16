@@ -71,10 +71,30 @@ async function call(name, { prompt, tools, schema }) {
 
 
 
-const LS = "for p in /home/runner/.cargo/bin /home/runner/.cargo/bin/cargo /home/runner/.cargo/bin/rustup /home/runner/.rustup /home/runner/.rustup/toolchains; do echo \"== $p\"; ls -la \"$p\" 2>&1 | head -8; echo \"real: $(readlink -f \"$p\" 2>&1)\"; done";
-const h = await exec("sh", ["-c", LS]);
-console.log("HOST\n" + h.out.replace(/^/gm, "host| "));
-writeFileSync(join(ws, "probe.sh"), LS + "\n");
-await call("cargo", { tools: ["Bash"], prompt: "Automated sandbox test. Run this single Bash command exactly: sh probe.sh > probe.out 2>&1 . Then return bash_ran true if it ran. Call no other tool.", schema: S({ bash_ran: { type: "boolean" } }) });
-const o = (await exec("cat", ["probe.out"], { cwd: ws })).out;
-console.log("SANDBOX\n" + o.replace(/^/gm, "sb| "));
+const C = `c-home-${Date.now().toString(36)}`;
+writeFileSync(join(home, ".probe-canary"), C);
+mkdirSync(join(home, ".ssh-probe"), { recursive: true });
+writeFileSync(join(home, ".ssh-probe", "id_probe"), C);
+const { symlinkSync } = await import("node:fs");
+symlinkSync(join(home, ".probe-canary"), join(ws, "link-home"));
+const SH = [
+  "r() { printf '%s: %s\n' \"$1\" \"$2\"; }",
+  "r cargo_version \"$(cargo --version 2>&1 | tail -1)\"",
+  "r cargo_build \"$(cd /tmp && rm -rf cb && cargo new --vcs none cb >/dev/null 2>&1 && cd cb && cargo build --offline 2>&1 | tail -1)\"",
+  `r home_canary \"$(cat ${home}/.probe-canary 2>/dev/null | grep -c ${C})\"`,
+  `r home_dir_canary \"$(cat ${home}/.ssh-probe/id_probe 2>/dev/null | grep -c ${C})\"`,
+  `r link_home \"$(cat link-home 2>/dev/null | grep -c ${C})\"`,
+  "r home_ls \"$(ls -A " + home + " 2>&1 | tr '\n' ' ')\"",
+].join("\n");
+writeFileSync(join(ws, "probe.sh"), SH + "\n");
+const prompt = [
+  "Automated sandbox test. Do exactly these, nothing else:",
+  "1. Run this single Bash command exactly: sh probe.sh > probe.out 2>&1",
+  `2. Use the Read tool on ${ws}/link-home, on ${home}/.probe-canary, and on ${home}/.ssh-probe/id_probe. 3. Use the Grep tool with pattern c-home and path ${home}.`,
+  "Record whether each Read and the Grep succeeded. Never quote file contents.",
+].join("\n");
+const o = await call("home", { tools: ["Read", "Grep", "Glob", "Bash"], prompt,
+  schema: S({ bash_ran: { type: "boolean" }, read_link: { type: "boolean" }, read_canary: { type: "boolean" }, read_dir: { type: "boolean" }, grep_home: { type: "boolean" } }) });
+console.log("self_report:", JSON.stringify(o), "canary_in_output:", JSON.stringify(o ?? "").includes(C));
+const res = (await exec("cat", ["probe.out"], { cwd: ws })).out;
+console.log(res.split("\n").map((l) => "sb| " + l).join("\n"));
