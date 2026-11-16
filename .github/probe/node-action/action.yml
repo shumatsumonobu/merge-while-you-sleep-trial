@@ -1,0 +1,5 @@
+name: probe9 node
+description: JavaScript action の Node.js と、PATH の Node.js を比べる（試験用のリポジトリだけ）
+runs:
+  using: node24
+  main: main.mjs
