@@ -40,3 +40,5 @@ writeFileSync(join(p, "g", "go.mod"), "module p\ngo 1.21\n");
 writeFileSync(join(p, "g", "m.go"), "package main\nfunc main(){}\n");
 await gate("gate.go_build", "cd g && go build -o /dev/null .", [".git"]);
 await gate("gate.cargo", "command -v cargo || echo none", [".git"]);
+await exec("sh", ["-c", "cargo new --vcs none c >/dev/null 2>&1"], { cwd: p, env: { ...baseEnv(), PATH: `${home}/.cargo/bin:${process.env.PATH}` } });
+await gate("gate.cargo_build", "cd c && cargo build --offline 2>&1 | tail -3", [".git"]);
