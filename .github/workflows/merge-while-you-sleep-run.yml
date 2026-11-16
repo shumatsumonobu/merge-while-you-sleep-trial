@@ -56,7 +56,7 @@ jobs:
       resume: ${{ steps.preflight.outputs.resume }}
     steps:
       - id: preflight
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/preflight@8186c3985526c1dafe62f88b1424e01102200e34
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/preflight@cd356dd32fe6a0994bf054d8c19fce8baad54916
         with:
           app_client_id: ${{ vars.APP_CLIENT_ID }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -91,7 +91,7 @@ jobs:
       - run: npm ci
       # ---- ここまで ----
       - id: work
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/work@8186c3985526c1dafe62f88b1424e01102200e34
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/work@cd356dd32fe6a0994bf054d8c19fce8baad54916
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           test_command: npm test
@@ -131,7 +131,7 @@ jobs:
           name: merge-while-you-sleep-bundle
           path: ${{ runner.temp }}/merge-while-you-sleep-bundle
       - id: submit
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/submit@8186c3985526c1dafe62f88b1424e01102200e34
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/submit@cd356dd32fe6a0994bf054d8c19fce8baad54916
         with:
           app_client_id: ${{ vars.APP_CLIENT_ID }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -154,7 +154,7 @@ jobs:
       pull-requests: read
       actions: read
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@8186c3985526c1dafe62f88b1424e01102200e34
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/cleanup@cd356dd32fe6a0994bf054d8c19fce8baad54916
         with:
           target: run
           needs: ${{ toJSON(needs) }}
