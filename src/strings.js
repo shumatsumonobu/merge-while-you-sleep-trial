@@ -35,3 +35,17 @@ export function capitalize(s) {
   if (c >= 97 && c <= 122) return String.fromCharCode(c - 32) + s.slice(1);
   return s;
 }
+
+/**
+ * s を n 回くり返した文字列を返す
+ * n が 0 以上の整数でなければ RangeError を投げる
+ * @param {string} s
+ * @param {number} n
+ * @returns {string}
+ */
+export function repeat(s, n) {
+  if (!Number.isInteger(n) || n < 0) {
+    throw new RangeError("n は 0 以上の整数にする");
+  }
+  return s.repeat(n);
+}
