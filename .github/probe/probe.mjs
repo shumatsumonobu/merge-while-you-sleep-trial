@@ -92,7 +92,7 @@ r spawned_bg "yes"
 }
 
 // ---------- Claude Code の sandbox ----------
-async function callClaude({ name, prompt, schema, tools, skills = [], settingsPatch = (s) => s }) {
+async function callClaude({ name, prompt, schema, tools, skills = [], settingsPatch = (s) => s, lockFix = true }) {
   const cfgDir = mkdtempSync(join(temp, "claude-config-"));
   const tmp = mkdtempSync("/tmp/mwys-probe-");
   let settings = buildSettings({
@@ -107,7 +107,9 @@ async function callClaude({ name, prompt, schema, tools, skills = [], settingsPa
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--json-schema", JSON.stringify(schema), "--model", "claude-sonnet-5-5",
     "--permission-mode", "dontAsk", "--settings", sf, "--tools", tools.join(","), "--allowedTools", tools.join(","),
     "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", "0.80", "--no-session-persistence"];
+  if (lockFix) writeFileSync(join(ws, ".git", "config.lock"), "");
   const r = await exec(claudePath, args, { cwd: ws, env, input: prompt, timeout: 600000 });
+  rmSync(join(ws, ".git", "config.lock"), { force: true });
   const redact = (t) => { let x = String(t ?? ""); for (const v of Object.values(C)) x = x.split(v).join("<canary>"); return x.replace(/\s+/g, " ").slice(0, 160); };
   const pending = new Map();
   let result = null;
@@ -152,6 +154,7 @@ const canaryHits = (o) => {
     ...Object.entries(READ_TARGETS).map(([k, p]) => `   - ${k}: ${p}`),
     "Never quote or repeat any file contents. Return only the booleans.",
   ].join("\n");
+  await callClaude({ name: "claude_nolock", prompt: "Run this single Bash command exactly: echo ok-from-sandbox . Then return bash_ran true if it succeeded, and false for every other field without calling any other tool.", schema: readSchema, tools: ["Bash"], lockFix: false });
   const r = await callClaude({ name: "claude_sb", prompt, schema: readSchema, tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"] });
   for (const [k, v] of Object.entries(r.output ?? {})) out(`claude_sb.read.${k}`, v);
   out("claude_sb.canary_in_output", canaryHits(r.output));
@@ -181,7 +184,7 @@ const canaryHits = (o) => {
       "    - matcher: \"Bash|Read\"",
       "      hooks:",
       "        - type: command",
-      "          command: \"touch /tmp/probe-skill-hook-${name}\"",
+      `          command: "touch ${ws}/hook-skill-${name}"`,
       "---",
       "Run the Bash command: echo probe-skill-ran",
       `Then use the Read tool on ${READ_TARGETS.tmp_direct} and on link-tmp, and report whether each Read succeeded.`,
@@ -189,11 +192,12 @@ const canaryHits = (o) => {
     ].join("\n"));
     const r = await callClaude({
       name, prompt, schema: skSchema, tools: ["Read", "Grep", "Glob", "Bash", "Skill"], skills: ["probe"],
-      settingsPatch: (s) => ({ ...s, disableAllHooks: hooksOff }),
+      settingsPatch: (s) => ({ ...s, disableAllHooks: hooksOff, hooks: { PreToolUse: [{ matcher: "Bash|Read|Skill", hooks: [{ type: "command", command: `touch ${ws}/hook-settings-${name}` }] }] } }),
     });
     for (const [k, v] of Object.entries(r.output ?? {})) out(`${name}.${k}`, v);
     out(`${name}.canary_in_output`, canaryHits(r.output));
-    out(`${name}.hook_fired`, existsSync(`/tmp/probe-skill-hook-${name}`));
+    out(`${name}.skill_hook_fired`, existsSync(join(ws, `hook-skill-${name}`)));
+    out(`${name}.settings_hook_fired`, existsSync(join(ws, `hook-settings-${name}`)));
   }
 }
 
@@ -203,8 +207,9 @@ const canaryHits = (o) => {
   out("cgroup.mkdir", r.code);
   const k = await exec("sudo", ["-n", "test", "-e", "/sys/fs/cgroup/probe-cg/cgroup.kill"], { env: baseEnv() });
   out("cgroup.kill_file", k.code === 0);
-  const bg = spawn("sh", ["-c", "setsid sleep 302 >/dev/null 2>&1 < /dev/null & sleep 60"], { detached: true, stdio: "ignore" });
+  const bg = spawn("sh", ["-c", "IFS= read -r _go; setsid sleep 302 >/dev/null 2>&1 < /dev/null & sleep 60"], { detached: true, stdio: ["pipe", "ignore", "ignore"] });
   await exec("sudo", ["-n", "sh", "-c", `echo ${bg.pid} > /sys/fs/cgroup/probe-cg/cgroup.procs`], { env: baseEnv() });
+  bg.stdin.end("\n");
   await new Promise((res) => setTimeout(res, 1500));
   out("cgroup.before_kill", (await exec("pgrep", ["-f", "sleep 302"])).out.trim() ? "running" : "none");
   await exec("sudo", ["-n", "sh", "-c", "echo 1 > /sys/fs/cgroup/probe-cg/cgroup.kill"], { env: baseEnv() });
