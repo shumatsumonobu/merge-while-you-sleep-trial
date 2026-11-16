@@ -17,7 +17,7 @@ import { diffEntries, fetchRef, makeGit, sha256 } from "../shared/git.mjs";
 import { labels, makeGitHub, repoFromEnv, runUrl, triggerLabelIfOurs } from "../shared/github.mjs";
 import { DEPENDENCY_PATHS, extractImports, FIXED_DENY_PATHS, matcher, PROTECTED_PATHS, resolveImport, testPaths } from "../shared/paths.mjs";
 import { baseEnv, exec } from "../shared/process.mjs";
-import { sanitizeOutbound } from "../shared/sanitize.mjs";
+import { codeBlock, sanitizeOutbound } from "../shared/sanitize.mjs";
 
 // このリポジトリの根（deps/sandbox-runtime/ を読む）
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -394,10 +394,12 @@ async function freshFlow(ctx, { isTest }) {
   if (protectedPlanned.length) {
     throw new Stop("outside_allowlist", "計画の工程が、変えさせないファイルを変える見込みと返した", { keepChanges: false });
   }
-  if (plan.files.some((f) => !ctx.inAllowlist(f, isTest))) {
+  const outsidePlanned = plan.files.filter((f) => !ctx.inAllowlist(f, isTest));
+  if (outsidePlanned.length) {
     ctx.state.automerge = false;
-    ctx.state.notes.push("計画の工程が、自動マージの範囲の外を変える見込みと返した。提出で自動マージを予約しない");
-    await ctx.deps.progress("計画の工程が、自動マージの範囲の外を変える見込みと返した。PR は作るが、自動マージは予約しない");
+    const list = codeBlock(outsidePlanned.slice(0, 20).join("\n"));
+    ctx.state.notes.push(`計画の工程が、自動マージの範囲の外を変える見込みと返した。提出で自動マージを予約しない:\n${list}`);
+    await ctx.deps.progress(`計画の工程が、自動マージの範囲の外を変える見込みと返した。PR は作るが、自動マージは予約しない:\n${list}`);
   }
   const planText = ["計画", plan.steps.map((s, i) => `${i + 1}. ${s}`).join("\n")];
 
@@ -847,7 +849,11 @@ async function modeWork() {
     let snapshot = protectedSnapshot(ws, { keep, imports });
     ctx.checkProtected = async () => {
       const d = compareSnapshots(snapshot, protectedSnapshot(ws, { keep, imports }));
-      if (d.length) throw new Stop("guard_tripped", "変えさせないファイルが変わったか、増えた");
+      if (d.length) {
+        // パスは Claude Code が名前を決められるので、コメントではコードブロックに入れる。ログは JSON で1行にする
+        log(`変えさせないファイルの変化: ${JSON.stringify(d.slice(0, 20))}`);
+        throw new Stop("guard_tripped", `変えさせないファイルが変わったか、増えた:\n${codeBlock(d.slice(0, 20).join("\n"))}`);
+      }
     };
     ctx.refreshProtected = () => {
       snapshot = protectedSnapshot(ws, { keep, imports });
