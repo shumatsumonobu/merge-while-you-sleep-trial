@@ -21,3 +21,4 @@ jobs:
           MODE: ${{ inputs.mode }}
           APP_CLIENT_ID: ${{ vars.APP_CLIENT_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+# update-branch の確認のために main を進める
