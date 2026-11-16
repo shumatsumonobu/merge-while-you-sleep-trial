@@ -15,6 +15,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 20
-      - run: echo "before.path_node: $(node --version)"
+      - run: 'echo "before.path_node=$(node --version)"'
       - uses: ./.github/probe/node-action
-      - run: echo "after.path_node: $(node --version) $(command -v node)"
+      - run: 'echo "after.path_node=$(node --version) $(command -v node)"'
