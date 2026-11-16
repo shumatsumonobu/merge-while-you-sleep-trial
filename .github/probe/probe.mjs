@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildSettings, claudeEnv, installBubblewrap, installClaude, runClaude } from "../actions/merge-while-you-sleep/shared/claude.mjs";
+import { buildSettings, claudeEnv, installBubblewrap, installClaude } from "../actions/merge-while-you-sleep/shared/claude.mjs";
 import { bwrapArgs, gateEnv } from "../actions/merge-while-you-sleep/work/work.mjs";
 import { baseEnv, exec } from "../actions/merge-while-you-sleep/shared/process.mjs";
 
@@ -104,15 +104,32 @@ async function callClaude({ name, prompt, schema, tools, skills = [], settingsPa
   const sf = join(cfgDir, "settings.json");
   writeFileSync(sf, JSON.stringify(settings));
   const env = claudeEnv({ oauth, cfgDir, tmp, passEnv: [] });
-  const args = ["-p", "--output-format", "json", "--json-schema", JSON.stringify(schema), "--model", "claude-haiku-5-5",
+  const args = ["-p", "--output-format", "stream-json", "--verbose", "--json-schema", JSON.stringify(schema), "--model", "claude-sonnet-5-5",
     "--permission-mode", "dontAsk", "--settings", sf, "--tools", tools.join(","), "--allowedTools", tools.join(","),
-    "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", "0.50", "--no-session-persistence"];
-  const r = await runClaude(env, { claudePath, args, prompt, cwd: ws, timeoutMs: 600000, callId: name });
-  out(`${name}.failure`, r.failure ? `${r.failure.reason} ${r.failure.message ?? ""}` : "none");
-  out(`${name}.cost`, r.cost);
+    "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", "0.80", "--no-session-persistence"];
+  const r = await exec(claudePath, args, { cwd: ws, env, input: prompt, timeout: 600000 });
+  const redact = (t) => { let x = String(t ?? ""); for (const v of Object.values(C)) x = x.split(v).join("<canary>"); return x.replace(/\s+/g, " ").slice(0, 160); };
+  const pending = new Map();
+  let result = null;
+  for (const line of r.out.split("\n")) {
+    let ev; try { ev = JSON.parse(line); } catch { continue; }
+    if (ev.type === "assistant") for (const c of ev.message?.content ?? []) {
+      if (c.type === "tool_use") pending.set(c.id, `${c.name} ${redact(c.input?.command ?? c.input?.file_path ?? c.input?.skill ?? c.input?.pattern ?? "")}`);
+    }
+    if (ev.type === "user") for (const c of ev.message?.content ?? []) {
+      if (c.type !== "tool_result") continue;
+      const text = typeof c.content === "string" ? c.content : JSON.stringify(c.content);
+      const hit = Object.entries(C).filter(([, v]) => text.includes(v)).map(([k]) => k).join(",") || "none";
+      out(`${name}.tool`, `${pending.get(c.tool_use_id)} | error=${!!c.is_error} | canary=${hit} | ${c.is_error ? redact(text) : ""}`);
+    }
+    if (ev.type === "result") result = ev;
+  }
+  out(`${name}.exit`, r.code);
+  out(`${name}.cost`, result?.total_cost_usd);
+  if (!result || result.is_error) out(`${name}.diag`, `${result?.subtype} ${redact(result?.result)} ${redact(r.err)}`);
   rmSync(cfgDir, { recursive: true, force: true });
   rmSync(tmp, { recursive: true, force: true });
-  return r;
+  return { output: result?.structured_output };
 }
 
 const READ_TARGETS = { link_rt: "link-rt", link_home: "link-home", link_environ: "link-environ", link_tmp: "link-tmp",
@@ -141,7 +158,7 @@ const canaryHits = (o) => {
   const sbOut = existsSync(join(ws, "probe-sb.out")) ? readFileSync(join(ws, "probe-sb.out"), "utf8") : "";
   process.stdout.write(sbOut.split("\n").filter((l) => l.startsWith("sandbox.")).join("\n") + "\n");
   out("claude_sb.sb_out_exists", sbOut.length > 0);
-  out("after_claude.sleep301_left", (await exec("pgrep", ["-f", "sleep 301"])).out.trim() || "none");
+  await exec("pkill", ["-f", "sleep 301"]);
   out("after_claude.dot_claude_exists", existsSync(join(ws, ".claude")));
 }
 
@@ -186,6 +203,17 @@ const canaryHits = (o) => {
   out("cgroup.mkdir", r.code);
   const k = await exec("sudo", ["-n", "test", "-e", "/sys/fs/cgroup/probe-cg/cgroup.kill"], { env: baseEnv() });
   out("cgroup.kill_file", k.code === 0);
+  const bg = spawn("sh", ["-c", "setsid sleep 302 >/dev/null 2>&1 < /dev/null & sleep 60"], { detached: true, stdio: "ignore" });
+  await exec("sudo", ["-n", "sh", "-c", `echo ${bg.pid} > /sys/fs/cgroup/probe-cg/cgroup.procs`], { env: baseEnv() });
+  await new Promise((res) => setTimeout(res, 1500));
+  out("cgroup.before_kill", (await exec("pgrep", ["-f", "sleep 302"])).out.trim() ? "running" : "none");
+  await exec("sudo", ["-n", "sh", "-c", "echo 1 > /sys/fs/cgroup/probe-cg/cgroup.kill"], { env: baseEnv() });
+  await new Promise((res) => setTimeout(res, 1000));
+  out("cgroup.after_kill", (await exec("pgrep", ["-f", "sleep 302"])).out.trim() ? "left" : "none");
   await exec("sudo", ["-n", "rmdir", "/sys/fs/cgroup/probe-cg"], { env: baseEnv() });
+  // ホストの側（比べるため）
+  out("host.docker_sock", existsSync("/run/docker.sock") || existsSync("/var/run/docker.sock"));
+  for (const t of ["go", "cargo"]) out(`host.which_${t}`, (await exec("sh", ["-lc", `command -v ${t} || echo none`])).out.trim());
+  out("host.gate_path", gateEnv([]).PATH);
 }
 try { process.kill(-P, "SIGKILL"); } catch {}
