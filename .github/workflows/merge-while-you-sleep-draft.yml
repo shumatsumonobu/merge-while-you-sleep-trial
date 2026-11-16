@@ -73,12 +73,13 @@ jobs:
           path: ${{ steps.draft.outputs.artifact_dir }}
           retention-days: 30
 
+  # 順番待ちの通知は labeled のイベントだけで出す ── テンプレートでラベル付きの Issue を作ると opened と labeled の両方が来て、
+  # 起動ラベルの labeled は concurrency のグループが別なので、opened でも出すと通知が2つになる
   notify:
     if: >-
       github.event_name == 'issues'
       && github.event.sender.type == 'User'
-      && ((github.event.action == 'labeled' && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run'))
-          || (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run')))
+      && github.event.action == 'labeled' && github.event.label.name == (vars.MERGE_WHILE_YOU_SLEEP_TRIGGER_LABEL || 'merge-while-you-sleep: run')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
