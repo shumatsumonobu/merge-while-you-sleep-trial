@@ -49,3 +49,12 @@ export function repeat(s, n) {
   }
   return s.repeat(n);
 }
+
+/**
+ * 小文字にし、続く空白を1つの - にまとめる
+ * @param {string} s
+ * @returns {string}
+ */
+export function kebab(s) {
+  return s.toLowerCase().replace(/\s+/g, "-");
+}
