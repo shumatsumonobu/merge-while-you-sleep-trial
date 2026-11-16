@@ -107,9 +107,15 @@ async function callClaude({ name, prompt, schema, tools, skills = [], settingsPa
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--json-schema", JSON.stringify(schema), "--model", "claude-sonnet-5-5",
     "--permission-mode", "dontAsk", "--settings", sf, "--tools", tools.join(","), "--allowedTools", tools.join(","),
     "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", "0.80", "--no-session-persistence"];
-  if (lockFix) writeFileSync(join(ws, ".git", "config.lock"), "");
+  const GIT_PLACEHOLDERS = ["config.lock", "config.worktree", "config.worktree.lock", "commondir", "worktrees", "modules", "info/exclude", "glab-cli"];
+  const made = [];
+  if (lockFix) for (const f of GIT_PLACEHOLDERS) {
+    const pth = join(ws, ".git", f);
+    if (!existsSync(pth)) { mkdirSync(join(pth, ".."), { recursive: true }); writeFileSync(pth, ""); made.push(pth); }
+  }
+  out(`${name}.placeholders`, made.map((x) => x.slice(ws.length + 1)).join(",") || "none");
   const r = await exec(claudePath, args, { cwd: ws, env, input: prompt, timeout: 600000 });
-  rmSync(join(ws, ".git", "config.lock"), { force: true });
+  for (const pth of made) rmSync(pth, { force: true });
   const redact = (t) => { let x = String(t ?? ""); for (const v of Object.values(C)) x = x.split(v).join("<canary>"); return x.replace(/\s+/g, " ").slice(0, 160); };
   const pending = new Map();
   let result = null;
