@@ -248,6 +248,47 @@ function remainingMs(ctx) {
 }
 
 /** Claude Code の工程を1回呼ぶ。呼ぶ前に、変えさせないファイルを確かめる */
+/** 作業ディレクトリの根の .claude の下にある、ファイルとディレクトリの一覧 */
+export function claudeDirEntries(ws) {
+  const out = new Set();
+  const walkDir = (rel) => {
+    let names = [];
+    try {
+      names = readdirSync(join(ws, rel));
+    } catch {
+      return;
+    }
+    out.add(rel);
+    for (const n of names) {
+      const r = `${rel}/${n}`;
+      const st = lstatSync(join(ws, r));
+      if (st.isDirectory()) walkDir(r);
+      else out.add(r);
+    }
+  };
+  walkDir(".claude");
+  return out;
+}
+
+/**
+ * Claude Code が呼び出しのたびに作業ディレクトリに作るものを消す（変えさせないファイルの照合の前）
+ * 消すのは .claude/.cc-writes と、呼び出しの前に無かった空のディレクトリだけ。中にファイルがあるディレクトリは残し、照合で止める
+ */
+export function removeClaudeArtifacts(ws, before) {
+  const marker = ".claude/.cc-writes";
+  if (!before.has(marker)) rmSync(join(ws, marker), { recursive: true, force: true });
+  const dirs = [...claudeDirEntries(ws)].filter((r) => !before.has(r)).sort((a, b) => b.length - a.length);
+  for (const r of dirs) {
+    let st;
+    try {
+      st = lstatSync(join(ws, r));
+    } catch {
+      continue;
+    }
+    if (st.isDirectory() && readdirSync(join(ws, r)).length === 0) rmSync(join(ws, r), { recursive: true, force: true });
+  }
+}
+
 async function callStage(ctx, stage, prompt) {
   checkLimits(ctx);
   await ctx.checkProtected();
@@ -261,6 +302,7 @@ async function callStage(ctx, stage, prompt) {
     timeoutMs: remainingMs(ctx),
     callId: ctx.state.callId,
   });
+  removeClaudeArtifacts(ctx.ws, ctx.claudeBefore || new Set());
   ctx.state.cost += r.cost || 0;
   log(`工程 ${stage}: 終わった（コスト ${(r.cost || 0).toFixed(2)} USD、合計 ${ctx.state.cost.toFixed(2)} USD）`);
   if (r.failure) throw r.failure;
@@ -847,6 +889,7 @@ async function modeWork() {
     }
 
     let snapshot = protectedSnapshot(ws, { keep, imports });
+    ctx.claudeBefore = claudeDirEntries(ws);
     ctx.checkProtected = async () => {
       const d = compareSnapshots(snapshot, protectedSnapshot(ws, { keep, imports }));
       if (d.length) {
