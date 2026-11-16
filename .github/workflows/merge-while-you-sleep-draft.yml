@@ -63,7 +63,7 @@ jobs:
         with:
           persist-credentials: false
       - id: draft
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/draft@38f3e26508cc8ac654ac67d83b085311279ba1b7
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/draft@784e0009dc5239393c9950a75a7ee257fdeb9ec3
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       - if: steps.draft.outputs.artifact_dir != ''
@@ -85,7 +85,7 @@ jobs:
       issues: write
       actions: read
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/notify@38f3e26508cc8ac654ac67d83b085311279ba1b7
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/notify@784e0009dc5239393c9950a75a7ee257fdeb9ec3
         with:
           run_workflow: merge-while-you-sleep-run.yml
 
@@ -97,7 +97,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@38f3e26508cc8ac654ac67d83b085311279ba1b7
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@784e0009dc5239393c9950a75a7ee257fdeb9ec3
         with:
           target: draft
           needs: ${{ toJSON(needs) }}
