@@ -27,7 +27,8 @@ async function modeDraft() {
   if (issueLabels.includes(L.trigger)) return done();
   const action = process.env.GITHUB_EVENT_NAME === "issue_comment" ? "comment" : ev.action;
   if (action === "labeled" && ev.label?.name !== L.draft) return done();
-  if (action === "opened" && !issueLabels.includes(L.draft)) return done();
+  // ラベル付きで作った Issue では labeled のイベントも来るので、opened では動かない（両方で動くと下書きが2つになる）
+  if (action === "opened") return done();
   if (action === "comment" && !issueLabels.includes(L.draft)) return done();
 
   const perms = new Map();
