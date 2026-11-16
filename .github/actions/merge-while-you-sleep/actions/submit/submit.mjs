@@ -1,7 +1,7 @@
 // actions/submit/submit.mjs — 提出の action の本体
 //
 // bundle を取り込んで確かめ直し、push、PR の作成、自動マージの予約、CI を待つ
-// App の秘密鍵を扱う。Claude Code も、対象プロジェクトのコードも実行しない（DESIGN.md の骨格の形）
+// App の秘密鍵を扱う。Claude Code も、対象プロジェクトのコードも実行しない（docs/design/README.md の骨格の形）
 // 取り込んだコミットを checkout しない ── 確かめ直しは作業ツリーを使わない git のコマンドだけで済む
 
 import { existsSync } from "node:fs";

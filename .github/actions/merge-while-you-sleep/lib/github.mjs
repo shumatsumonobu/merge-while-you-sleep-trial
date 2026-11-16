@@ -111,7 +111,7 @@ export function labels() {
 // ---------- 権限とラベルのイベント ----------
 
 
-/** 権限を確かめる。write（admin か write）、triage、none のどれか（DESIGN.md の下書きの始め方） */
+/** 権限を確かめる。write（admin か write）、triage、none のどれか（docs/design/draft.md の下書きの始め方） */
 export async function permissionOf(gh, login, cache = new Map()) {
   if (cache.has(login)) return cache.get(login);
   const { full } = repoFromEnv();

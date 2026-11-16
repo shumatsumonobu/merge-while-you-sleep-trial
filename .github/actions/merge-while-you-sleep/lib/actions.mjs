@@ -35,7 +35,7 @@ const RAW_OUTPUT = /^[A-Za-z0-9._:/-]*$/;
 
 /**
  * step の出力を書く。値は1行にする ── 複数行の書き方は、値の中に区切りの行があると
- * ほかの出力を書き換えられる（DESIGN.md の出口で消す）。
+ * ほかの出力を書き換えられる（docs/design/security.md の出口で消す）。
  * 文字列でない値と、決まった文字だけでできていない値は JSON にする
  */
 export function setOutput(name, value) {
@@ -58,7 +58,7 @@ export function getState(name) {
 }
 
 /**
- * ログに出す。出すのは工程の名前、終了コード、コストだけ（DESIGN.md の出口で消す）。
+ * ログに出す。出すのは工程の名前、終了コード、コストだけ（docs/design/security.md の出口で消す）。
  * 呼ぶ側は Claude Code の出力もゲートの出力も渡さないが、念のため行頭の :: を崩す
  * ── 標準出力の :: で始まる行は、ワークフローのコマンドとして解釈されうる
  */

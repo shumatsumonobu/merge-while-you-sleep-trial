@@ -1,6 +1,6 @@
 // lib/pr-token.mjs — PR 用トークン（GitHub App のインストールトークン）の発行と取り消し
 //
-// 開始の確認と提出のジョブだけが使う。Claude Code を呼ぶジョブには App の秘密鍵を渡さない（DESIGN.md の提出を別のジョブにする）
+// 開始の確認と提出のジョブだけが使う。Claude Code を呼ぶジョブには App の秘密鍵を渡さない（docs/design/security.md の提出を別のジョブにする）
 
 import { createSign } from "node:crypto";
 import { input, mask } from "./actions.mjs";

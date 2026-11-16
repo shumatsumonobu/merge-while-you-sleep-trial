@@ -19,7 +19,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // ---------- 固定する版 ----------
 
-// Claude Code は版ごとの配布物を直接取得し、ここに書いた SHA-256 と照合してから実行する（DESIGN.md の供給元を固定する）
+// Claude Code は版ごとの配布物を直接取得し、ここに書いた SHA-256 と照合してから実行する（docs/design/security.md の供給元を固定する）
 // 2.1.314 より前の版には permissions.blockWritesOutsideWorkingDirectories が無い（Settings reference）
 export const CLAUDE_VERSION = "2.1.319";
 
@@ -31,7 +31,7 @@ export const CLAUDE_SHA256 = {
 const CLAUDE_URL = (v, p) => `https://downloads.claude.ai/claude-code-releases/${v}/${p}/claude`;
 
 // disableAllHooks がスキルの frontmatter の hooks も止めることを、2.1.319 で runner で確かめた
-// 版を上げるときは確かめ直す。止めない版では false にし、Skill を許さない（DESIGN.md の「変えさせないファイルは、書き込みを止める」）
+// 版を上げるときは確かめ直す。止めない版では false にし、Skill を許さない（docs/design/security.md の「変えさせないファイルは、書き込みを止める」）
 export const SKILL_HOOKS_VERIFIED = true;
 
 // ---------- 既定値 ----------
@@ -171,7 +171,7 @@ export function loadPrompt(name) {
 const untrustedBlock = (name, text) =>
   `<untrusted name="${name}">\n${String(text ?? "").replace(/<\/?untrusted/gi, (m) => m.replace("<", "＜"))}\n</untrusted>`;
 
-/** 「指示文 → 信頼できるデータ → 信頼できないデータ」の順に組み立てる（DESIGN.md の指示文と Claude Code に渡すもの） */
+/** 「指示文 → 信頼できるデータ → 信頼できないデータ」の順に組み立てる（docs/design/run.md の指示文と Claude Code に渡すもの） */
 export function buildPrompt(name, { trusted = [], untrusted = [] }) {
   const parts = [loadPrompt(name).trim(), "", "# 信頼できるデータ", ""];
   if (trusted.length === 0) parts.push("なし");
@@ -191,7 +191,7 @@ export function buildPrompt(name, { trusted = [], untrusted = [] }) {
 // ---------- Claude Code の呼び出し ----------
 
 
-/** Claude Code に渡す --settings を組み立てる（DESIGN.md の Claude Code に許す操作） */
+/** Claude Code に渡す --settings を組み立てる（docs/design/security.md の Claude Code に許す操作） */
 export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWrite = [], editDeny = [], allowDomains = [], skills = [], tmp }) {
   const deny = [
     "WebFetch", "WebSearch",
@@ -206,6 +206,7 @@ export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWri
     permissions: {
       defaultMode: "dontAsk",
       deny,
+      // スキルは名前ごとに許す。名前の付かない Skill は --allowedTools に入れない ── 入れると、作業の中で作られたスキルも許す
       allow: skills.map((n) => `Skill(${n})`),
       disableBypassPermissionsMode: "disable",
       blockReadsOutsideWorkingDirectories: true,
@@ -214,7 +215,7 @@ export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWri
     disableAllHooks: true,
     disableSkillShellExecution: true,
     // CLAUDE_CODE_SUBPROCESS_ENV_SCRUB は使わない ── 2.1.319 では、あると sandbox.filesystem.denyRead が効かず、
-    // .git の中にマウントの先を作ろうとして sandbox のコマンドが起動しない（DESIGN.md の Claude Code に鍵を読ませない）
+    // .git の中にマウントの先を作ろうとして sandbox のコマンドが起動しない（docs/design/security.md の Claude Code に鍵を読ませない）
     env: { DISABLE_UPDATES: "1", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
   };
   if (sandbox) {
@@ -269,7 +270,7 @@ export function failureDiagnostics(r, parsed, secrets = []) {
   ].join(" / ");
 }
 
-/** sudo で cgroup を作る。作れなければ null（DESIGN.md の実装のときに確かめること） */
+/** sudo で cgroup を作る。作れなければ null（docs/design/gates.md のゲートの実装のときに確かめること） */
 async function makeCgroup(name) {
   const p = `/sys/fs/cgroup/${name}`;
   const r = await exec("sudo", ["-n", "mkdir", p], { env: baseEnv() });
@@ -425,7 +426,57 @@ export async function installClaude() {
   return path;
 }
 
-/** 土台のコミットの設定のファイルに helper のコマンドがあるか（DESIGN.md の Claude Code に許す操作） */
+/**
+ * 土台のコミットのスキルのうち、名前ごとに許すもの（docs/design/security.md の Claude Code に許す操作）。
+ * files は土台のコミットの git ls-files。frontmatter に hooks を書いたもの、frontmatter が閉じていないもの、
+ * 名前に許さない文字があるものは許さない（allow ルールの書き方を崩させない）
+ */
+export function baseSkills(ws, files) {
+  const allowed = new Set();
+  const excluded = [];
+  for (const f of files) {
+    const names = [];
+    let m = f.match(/(?:^|\/)\.claude\/skills\/([^/]+)\/SKILL\.md$/);
+    const isSkill = Boolean(m);
+    if (m) names.push(m[1]);
+    else if ((m = f.match(/^\.claude\/commands\/(.+)\.md$/))) names.push(m[1].split("/").join(":"));
+    else continue;
+    let text;
+    try {
+      text = readFileSync(join(ws, f), "utf8");
+    } catch {
+      excluded.push(`${f}（読めない）`);
+      continue;
+    }
+    const fm = frontmatter(text);
+    if (fm === null) {
+      excluded.push(`${f}（frontmatter が閉じていない）`);
+      continue;
+    }
+    if (/^\s*hooks\s*:/m.test(fm)) {
+      excluded.push(`${f}（hooks を書いている）`);
+      continue;
+    }
+    const named = isSkill ? fm.match(/^name\s*:\s*["']?([^"'\s#]+)/m) : null;
+    if (named) names.push(named[1]);
+    for (const n of names) {
+      if (/^[A-Za-z0-9_.:-]+$/.test(n)) allowed.add(n);
+      else excluded.push(`${f}（名前に許さない文字がある）`);
+    }
+  }
+  return { allowed: [...allowed].sort(), excluded };
+}
+
+/** 先頭の --- から次の --- までを返す。frontmatter が無ければ空、閉じていなければ null */
+function frontmatter(text) {
+  const t = text.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  if (!t.startsWith("---\n")) return "";
+  const rest = t.slice(4);
+  const end = rest.search(/^---[ \t]*$/m);
+  return end < 0 ? null : rest.slice(0, end);
+}
+
+/** 土台のコミットの設定のファイルに helper のコマンドがあるか（docs/design/security.md の Claude Code に許す操作） */
 export function findHelpers(ws) {
   const files = [join(ws, ".claude", "settings.json"), join(ws, ".claude", "settings.local.json"), join(process.env.HOME || "", ".claude", "settings.json")];
   const found = [];

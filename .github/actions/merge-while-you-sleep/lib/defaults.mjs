@@ -1,4 +1,4 @@
-// lib/defaults.mjs — 工程ごとのモデルと、上限の既定値（DESIGN.md のモデルの節と、上限と繰り返しの検知の節）
+// lib/defaults.mjs — 工程ごとのモデルと、上限の既定値（docs/design/run.md のモデルと、docs/design/gates.md の上限と繰り返しの検知）
 
 
 

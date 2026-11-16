@@ -38,7 +38,7 @@ export function matcher(patterns, opts) {
   return (path) => res.some((r) => r.test(path));
 }
 
-/** テストのファイルの既定のパターン（DESIGN.md のゲートの節） */
+/** テストのファイルの既定のパターン（docs/design/gates.md のゲート） */
 export const DEFAULT_TEST_PATHS = [
   "**/*.test.*", "**/*.spec.*", "**/test/**", "**/tests/**", "**/spec/**", "**/__tests__/**",
   "**/test_*.*", "**/*_test.*", "**/*_spec.*", "**/*Test.*", "**/*Tests.*",
@@ -66,7 +66,7 @@ export const DEPENDENCY_PATHS = [
   "**/.nvmrc", "**/.node-version", "**/.python-version", "**/.tool-versions",
 ];
 
-/** 必ず外すファイル（どの階層にあっても外す。足せるが、減らせない）── DESIGN.md の自動マージの範囲 */
+/** 必ず外すファイル（どの階層にあっても外す。足せるが、減らせない）── docs/design/gates.md の自動マージの範囲 */
 export const FIXED_DENY_PATHS = [
   ...PROTECTED_PATHS,
   "**/CODEOWNERS",

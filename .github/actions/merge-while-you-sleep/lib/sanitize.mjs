@@ -6,7 +6,7 @@
 
 
 /**
- * Claude Code に渡す前に、画面に出ない文字を除く（DESIGN.md の指示文と Claude Code に渡すもの）
+ * Claude Code に渡す前に、画面に出ない文字を除く（docs/design/run.md の指示文と Claude Code に渡すもの）
  * HTML のコメント、幅の無い文字、文字の向きを変える制御文字
  */
 export function stripInvisible(s) {
@@ -20,7 +20,7 @@ export function stripInvisible(s) {
 const CLOSING = /\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b/gi;
 
 /**
- * Claude Code が書いた部分と Issue の文面を、外に出す前に消毒する（DESIGN.md の出口で消す、提出のジョブの決まり）
+ * Claude Code が書いた部分と Issue の文面を、外に出す前に消毒する（docs/design/security.md の出口で消す、提出のジョブの決まり）
  * - 鍵の文字列を消す
  * - 画像、HTML、リンクを除く（リンクは URL を文字のまま残す）
  * - @ を全角の ＠ に変え、Issue を閉じるキーワードを効かない形にする

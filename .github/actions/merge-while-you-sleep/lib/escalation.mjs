@@ -7,7 +7,7 @@ import { labels, repoFromEnv, runUrl } from "./github.mjs";
 // ---------- 人への引き継ぎ ----------
 
 
-/** 人への引き継ぎの理由（DESIGN.md の人への引き継ぎの表）。コードの中ではこの名前で扱う */
+/** 人への引き継ぎの理由（docs/design/escalation.md の人への引き継ぎの表）。コードの中ではこの名前で扱う */
 export const REASONS = {
   cannot_start: { title: "始められない", next: "設定か Issue か main を直して、下書きラベルか起動ラベルを付け直してください。sandbox と隔離が起動できないときは、runner の種類（GitHub ホストの Ubuntu）と入力を確かめてください。PR 用トークンを発行できないときは、App のインストール先と秘密鍵を確かめてください" },
   criteria_insufficient: { title: "完了条件が足りない", next: "完了条件を直して、下書きラベルか起動ラベルを付け直してください" },
@@ -56,7 +56,7 @@ export async function removeLabel(gh, issue, name) {
 
 /**
  * 人に引き継ぐ: 引き継ぎラベルを付け、起動した人を @メンションしてコメントし、起動ラベルを外す
- * （DESIGN.md の引き継ぎの方法）。details は消毒済みの文字列
+ * （docs/design/escalation.md の引き継ぎの方法）。details は消毒済みの文字列
  */
 export async function escalate(gh, { issue, reason, mention, details = "", removeLabels = [], extra = {} }) {
   const r = REASONS[reason];

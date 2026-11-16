@@ -1,7 +1,7 @@
 // actions/preflight/preflight.mjs — 開始の確認の action の本体
 //
 // 権限、設定、承認を確かめ、承認を記録し、土台のコミットを決める。続きから進める PR も探す
-// App の秘密鍵を扱う。Claude Code も、対象プロジェクトのコードも実行しない（DESIGN.md の骨格の形）
+// App の秘密鍵を扱う。Claude Code も、対象プロジェクトのコードも実行しない（docs/design/README.md の骨格の形）
 
 import { pathToFileURL } from "node:url";
 import { inflateRawSync } from "node:zlib";

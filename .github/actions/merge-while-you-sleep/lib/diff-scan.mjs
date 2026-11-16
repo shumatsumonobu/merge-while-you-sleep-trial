@@ -5,7 +5,7 @@
 // ---------- 足した行と消した行の照合（提出のジョブ）----------
 
 
-/** 足した行にあれば範囲の外にする書き方（DESIGN.md の提出を別のジョブにする）。照合は正規化したあとの文字列 */
+/** 足した行にあれば範囲の外にする書き方（docs/design/security.md の提出を別のジョブにする）。照合は正規化したあとの文字列 */
 export const DEFAULT_DENY_PATTERNS = [
   "eslint-disable", "/*eslint", "@ts-nocheck", "@ts-ignore", "@ts-expect-error",
   "stryker disable", "istanbul ignore", "c8 ignore", "noqa", "type: ignore", "# mypy:",

@@ -4,13 +4,13 @@
 // post の step（action.yml の runs.post）では、作業の action が変えた作業ツリーを土台のコミットに戻す
 //
 // 判定はこのファイルのコードで決める。Claude Code の自己申告を合否に使わない ── 合否はゲートの終了コード
-// ログには工程の名前、ゲートの終了コード、コストだけを出す。Claude Code の呼び出しが失敗したときだけ、エラーの項目を鍵を消して出す（DESIGN.md の出口で消す）
+// ログには工程の名前、ゲートの終了コード、コストだけを出す。Claude Code の呼び出しが失敗したときだけ、エラーの項目を鍵を消して出す（docs/design/security.md の出口で消す）
 
 import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getState, input, inputBool, inputNumber, log, mask, runnerTemp, saveState, setOutput, splitList } from "../../lib/actions.mjs";
-import { buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, killAllCgroups, runClaude, SCHEMAS, SKILL_HOOKS_VERIFIED, usageText, validate } from "../../lib/claude.mjs";
+import { baseSkills, buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, killAllCgroups, runClaude, SCHEMAS, SKILL_HOOKS_VERIFIED, usageText, validate } from "../../lib/claude.mjs";
 import { LIMITS, MODELS } from "../../lib/defaults.mjs";
 import { comment, escalate, marker, REASONS, Stop } from "../../lib/escalation.mjs";
 import { diffEntries, fetchRef, makeGit, sha256 } from "../../lib/git.mjs";
@@ -101,7 +101,7 @@ export function compareSnapshots(before, after) {
 
 /**
  * CLAUDE.md と AGENTS.md から @ の取り込み先をたどる（最大5段。Memory のページの上限は4段）。
- * 取り込み先がまだ無いパスでも一覧に入れる（DESIGN.md の必ず外すファイル）
+ * 取り込み先がまだ無いパスでも一覧に入れる（docs/design/gates.md の必ず外すファイル）
  * @param readFile (relPath) => string | null
  * @param roots 取り込み元の CLAUDE.md、CLAUDE.local.md、AGENTS.md のパス
  */
@@ -131,7 +131,7 @@ export function traceImports(roots, readFile) {
 
 const expandHome = (p) => (p.startsWith("~/") ? join(process.env.HOME || "/home/runner", p.slice(2)) : p);
 
-/** bubblewrap の引数を組み立てる（DESIGN.md の隔離の中身） */
+/** bubblewrap の引数を組み立てる（docs/design/security.md の隔離の中身） */
 export function bwrapArgs({ ws, readOnlyInWs, readPaths, network, home }) {
   const a = ["--die-with-parent", "--new-session", "--unshare-user-try", "--unshare-ipc", "--unshare-pid", "--unshare-uts", "--unshare-cgroup-try"];
   if (!network) a.push("--unshare-net");
@@ -839,6 +839,8 @@ async function modeWork() {
     const isTest = matcher(cfg.testPaths);
     const baseFiles = (await git(["ls-files", "-z"])).out.split("\0").filter(Boolean);
     const baseTests = new Set(baseFiles.filter(isTest));
+    const skills = baseSkills(ws, baseFiles);
+    if (skills.excluded.length) log(`許さないスキル: ${skills.excluded.join("、")}`);
     if (baseTests.size === 0) throw new Stop("cannot_start", "土台のコミットに、テストのパターンに合うファイルが無い（変数 MERGE_WHILE_YOU_SLEEP_TEST_PATHS で直す）");
     const imports = await importsAt(git, base);
 
@@ -846,7 +848,7 @@ async function modeWork() {
     await installSandboxDeps();
 
     ctx = {
-      ws, git, approval, cfg, base, start: base, reviewBase: base, keep, imports, baseTests, resume,
+      ws, git, approval, cfg, base, start: base, reviewBase: base, keep, imports, baseTests, resume, skills: skills.allowed,
       now: () => Date.now(),
       inAllowlist: makeInAllowlist({ allowPaths: cfg.allowPaths, denyPaths: cfg.denyPaths, imports, baseTests }),
     };
@@ -991,21 +993,24 @@ async function realClaude(ctx, claudePath, oauth, stage, { prompt, schema, model
   const readOnly = readOnlyPathsInWs(ws, ctx.keep, ctx.imports);
   const readOnlyStage = stage === "plan" || stage === "review";
   const tools = readOnlyStage ? ["Read", "Grep", "Glob"] : ["Read", "Grep", "Glob", "Edit", "Write", "Bash"];
-  if (SKILL_HOOKS_VERIFIED && !readOnlyStage) tools.push("Skill");
-  if (!readOnlyStage) tools.push(...cfg.allowTools); // 読むだけの工程は sandbox なしで動くので、足さない
+  // 読むだけの工程は sandbox なしで動くので、足さない。Skill は下で名前ごとに許すので、入力からは足させない
+  if (!readOnlyStage) tools.push(...cfg.allowTools.filter((t) => !/^Skill/.test(t)));
+  // Skill は --tools にだけ入れ、--allowedTools には入れない。許すのは settings の Skill(<名前>) の土台のスキルだけ
+  const useSkill = SKILL_HOOKS_VERIFIED && !readOnlyStage && ctx.skills.length > 0;
+  const available = useSkill ? [...tools, "Skill"] : tools;
   const settings = buildSettings({
     ws, runnerTemp: temp, sandbox: !readOnlyStage, readPaths: cfg.readPaths,
     denyWrite: readOnly.map((p) => join(ws, p)),
     editDeny: [...ctx.keep.map((k) => `Edit(${k}/**)`), ...[...ctx.imports].map((p) => `Edit(${p})`)],
-    allowDomains: cfg.allowDomains, skills: [], tmp,
+    allowDomains: cfg.allowDomains, skills: useSkill ? ctx.skills : [], tmp,
   });
   const settingsFile = join(cfgDir, "settings.merge-while-you-sleep.json");
   writeFileSync(settingsFile, JSON.stringify(settings));
   const env = claudeEnv({ oauth, cfgDir, tmp, passEnv: cfg.passEnv });
   const args = [
     "-p", "--output-format", "json", "--json-schema", JSON.stringify(schema), "--model", model,
-    "--permission-mode", "dontAsk", "--settings", settingsFile, "--tools", tools.join(","),
-    // --tools で使えるツールを絞り、--allowedTools で同じツールを聞かずに許す
+    "--permission-mode", "dontAsk", "--settings", settingsFile, "--tools", available.join(","),
+    // --tools で使えるツールを絞り、--allowedTools で Skill のほかを聞かずに許す
     "--allowedTools", tools.join(","),
     "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", budget.toFixed(2), "--no-session-persistence",
   ];

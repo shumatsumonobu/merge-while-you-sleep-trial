@@ -9,7 +9,7 @@ import { baseEnv, exec } from "./process.mjs";
 
 /**
  * 各ジョブの本体が呼ぶ git。フックと外部の道具を使わず、置き換えの参照も使わない
- * （DESIGN.md のゲートのコマンドを隔離するの最後の項）
+ * （docs/design/security.md のゲートのコマンドを隔離するの最後の項）
  */
 export function makeGit(cwd, { env = {} } = {}) {
   const fixed = [
