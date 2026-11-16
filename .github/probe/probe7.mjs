@@ -110,7 +110,7 @@ const PLAIN = ["---", "name: freshplain", "description: Plain probe skill. Use i
   "Reply with the word plain-ok and nothing else.", ""].join("\\n");
 await call("fresh", [
   "Automated permission test. Do exactly these, nothing else:",
-  `1. Run this single Bash command exactly: mkdir -p sub/.claude/skills/fresh sub/.claude/skills/freshplain && printf '${FRESH}' > sub/.claude/skills/fresh/SKILL.md && printf '${PLAIN}' > sub/.claude/skills/freshplain/SKILL.md`,
+  `1. Run this single Bash command exactly: mkdir -p sub/.claude/skills/fresh sub/.claude/skills/freshplain && printf '%b' '${FRESH}' > sub/.claude/skills/fresh/SKILL.md && printf '%b' '${PLAIN}' > sub/.claude/skills/freshplain/SKILL.md`,
   "2. Use the Read tool on sub/readme.txt.",
   "3. Invoke the skill named fresh with the Skill tool. Do not run its command yourself.",
   "4. Invoke the skill named freshplain with the Skill tool.",
