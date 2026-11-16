@@ -7,7 +7,8 @@ import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runnerTemp } from "./actions.mjs";
+import { log, runnerTemp } from "./actions.mjs";
+import { scrubSecrets, stripInvisible } from "./sanitize.mjs";
 import { Stop } from "./escalation.mjs";
 import { sha256 } from "./git.mjs";
 import { baseEnv, exec, which } from "./process.mjs";
@@ -235,11 +236,31 @@ export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWri
 /** Claude Code の結果の JSON から、止まった理由を見分ける（理由の文字列は実装のときに確かめる） */
 export function classifyClaudeFailure(r, parsed) {
   const text = `${parsed?.result ?? ""} ${parsed?.subtype ?? ""} ${r.err ?? ""}`;
+  const status = Number(parsed?.api_error_status) || 0;
   if (r.timedOut) return new Stop("limit_reached", "時間の上限に達した（Claude Code の呼び出し中）");
+  // Claude Code が返す HTTP のステータスを先に見る。語で見るのは、ステータスが無いときだけ
+  if (status === 401 || status === 403) return new Stop("interrupted", `Claude Code の認証が通らなかった（HTTP ${status}）`);
+  if (status === 429) return new Stop("limit_reached", "サブスクの利用枠の上限に達した（HTTP 429）");
   if (/max_budget|budget/i.test(text)) return new Stop("limit_reached", "コストの上限に達した");
-  if (/usage limit|limit reached|rate.?limit|429|quota/i.test(text)) return new Stop("limit_reached", "サブスクの利用枠の上限に達した");
-  if (/auth|login|oauth|401|403|credential|token/i.test(text)) return new Stop("interrupted", "Claude Code の認証が通らなかった");
+  if (!status && /usage limit|rate.?limit|quota/i.test(text)) return new Stop("limit_reached", "サブスクの利用枠の上限に達した");
+  if (!status && /failed to authenticate|not logged in|invalid (api key|bearer)|oauth token/i.test(text)) return new Stop("interrupted", "Claude Code の認証が通らなかった");
   return null;
+}
+
+/**
+ * Claude Code が失敗したときにログに出す項目。成功したときは出さない（読んだファイルの中身をログに出さない）
+ * 鍵の値は消してから出す
+ */
+export function failureDiagnostics(r, parsed, secrets = []) {
+  const first = (s) => scrubSecrets(stripInvisible(String(s ?? "")).replace(/\s+/g, " ").trim(), secrets).slice(0, 200);
+  return [
+    `終了コード ${r.code}`,
+    `api_error_status ${parsed?.api_error_status ?? "-"}`,
+    `subtype ${parsed?.subtype ?? "-"}`,
+    `terminal_reason ${parsed?.terminal_reason ?? "-"}`,
+    `result ${first(parsed?.result) || "-"}`,
+    `stderr ${first(r.err) || "-"}`,
+  ].join(" / ");
 }
 
 /** sudo で cgroup を作る。作れなければ null（DESIGN.md の実装のときに確かめること） */
@@ -306,6 +327,7 @@ export async function runClaude(env, { claudePath, args, prompt, cwd, timeoutMs,
   if (leftovers) return { output: null, cost: parsed?.total_cost_usd ?? 0, failure: new Stop("guard_tripped", "Claude Code の呼び出しのあとに、止められないプロセスが残った") };
   const cost = Number(parsed?.total_cost_usd ?? 0) || 0;
   if (code !== 0 || !parsed || parsed.is_error) {
+    log(`Claude Code が失敗した: ${failureDiagnostics(r, parsed, [env.CLAUDE_CODE_OAUTH_TOKEN])}`);
     return { output: null, cost, failure: classifyClaudeFailure(r, parsed) || new Stop("undecidable", `Claude Code が終了コード ${code} で終わった`) };
   }
   if (parsed.structured_output === undefined) return { output: null, cost, failure: new Stop("undecidable", "レポートが返らなかった") };

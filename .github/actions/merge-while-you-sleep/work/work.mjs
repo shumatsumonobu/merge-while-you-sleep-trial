@@ -4,7 +4,7 @@
 // post の step（action.yml の runs.post）では、作業の action が変えた作業ツリーを土台のコミットに戻す
 //
 // 判定はこのファイルのコードで決める。Claude Code の自己申告を合否に使わない ── 合否はゲートの終了コード
-// ログには工程の名前、ゲートの終了コード、コストだけを出す（DESIGN.md の出口で消す）
+// ログには工程の名前、ゲートの終了コード、コストだけを出す。Claude Code の呼び出しが失敗したときだけ、エラーの項目を鍵を消して出す（DESIGN.md の出口で消す）
 
 import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
