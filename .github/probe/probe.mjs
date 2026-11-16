@@ -93,7 +93,7 @@ if (!process.env.ONLY) {
 }
 
 // ---------- Claude Code の sandbox ----------
-async function callClaude({ name, prompt, schema, tools, skills = [], settingsPatch = (s) => s, lockFix = true, envPatch = (e) => e }) {
+async function callClaude({ name, prompt, schema, tools, skills = [], settingsPatch = (s) => s, lockFix = false, envPatch = (e) => e }) {
   const cfgDir = mkdtempSync(join(temp, "claude-config-"));
   const tmp = mkdtempSync("/tmp/mwys-probe-");
   let settings = buildSettings({
