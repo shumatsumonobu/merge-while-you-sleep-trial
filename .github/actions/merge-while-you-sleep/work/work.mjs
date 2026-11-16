@@ -965,6 +965,8 @@ async function realClaude(ctx, claudePath, oauth, stage, { prompt, schema, model
   const args = [
     "-p", "--output-format", "json", "--json-schema", JSON.stringify(schema), "--model", model,
     "--permission-mode", "dontAsk", "--settings", settingsFile, "--tools", tools.join(","),
+    // CLAUDE_CODE_SUBPROCESS_ENV_SCRUB があると permission のモードが default に戻されるので、許すツールを明示する
+    "--allowedTools", tools.join(","),
     "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", budget.toFixed(2), "--no-session-persistence",
   ];
   const r = await runClaude(env, { claudePath, args, prompt, cwd: ws, timeoutMs, callId });

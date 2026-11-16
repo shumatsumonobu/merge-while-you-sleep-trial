@@ -101,7 +101,7 @@ async function modeDraft() {
     claudePath,
     args: [
       "-p", "--output-format", "json", "--json-schema", JSON.stringify(SCHEMAS.draft), "--model", input("model_draft", MODELS.draft),
-      "--permission-mode", "dontAsk", "--settings", join(cfgDir, "settings.merge-while-you-sleep.json"), "--tools", "Read,Grep,Glob",
+      "--permission-mode", "dontAsk", "--settings", join(cfgDir, "settings.merge-while-you-sleep.json"), "--tools", "Read,Grep,Glob", "--allowedTools", "Read,Grep,Glob",
       "--strict-mcp-config", "--disallowedTools", "mcp__*",
       "--max-budget-usd", inputNumber("max_draft_cost_usd", LIMITS.max_draft_cost_usd).toFixed(2), "--no-session-persistence",
     ],
