@@ -43,7 +43,7 @@ inputs:
     required: false
     default: "false"
   bundle_path:
-    description: actions/download-artifact で受け取った bundle のパス
+    description: actions/download-artifact で受け取った bundle のパス。既定は RUNNER_TEMP の下の merge-while-you-sleep-bundle/work.bundle
     required: false
 
 outputs:

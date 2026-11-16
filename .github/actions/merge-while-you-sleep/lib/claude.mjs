@@ -428,11 +428,13 @@ export async function installClaude() {
 
 /**
  * 土台のコミットのスキルのうち、名前ごとに許すもの（docs/design/security.md の Claude Code に許す操作）。
- * files は土台のコミットの git ls-files。frontmatter に hooks を書いたもの、frontmatter が閉じていないもの、
- * 名前に許さない文字があるものは許さない（allow ルールの書き方を崩させない）
+ * files は git ls-files の結果。許さないのは、frontmatter に hooks の語があるもの（引用符や flow 形式の書き方も含めて、
+ * 語があれば外す）、frontmatter が閉じていないもの、名前に許さない文字があるもの。
+ * 許さないスキルと同じ名前は、ほかのファイルで許していても外す ── allow ルールは名前だけで照らすので、同じ名前のスキルにも当たる
  */
 export function baseSkills(ws, files) {
   const allowed = new Set();
+  const blocked = new Set();
   const excluded = [];
   for (const f of files) {
     const names = [];
@@ -441,37 +443,46 @@ export function baseSkills(ws, files) {
     if (m) names.push(m[1]);
     else if ((m = f.match(/^\.claude\/commands\/(.+)\.md$/))) names.push(m[1].split("/").join(":"));
     else continue;
+    const exclude = (why) => {
+      excluded.push(`${f}（${why}）`);
+      for (const n of names) blocked.add(n);
+    };
     let text;
     try {
       text = readFileSync(join(ws, f), "utf8");
     } catch {
-      excluded.push(`${f}（読めない）`);
+      exclude("読めない");
       continue;
     }
     const fm = frontmatter(text);
     if (fm === null) {
-      excluded.push(`${f}（frontmatter が閉じていない）`);
+      exclude("frontmatter が閉じていない");
       continue;
     }
-    if (/^\s*hooks\s*:/m.test(fm)) {
-      excluded.push(`${f}（hooks を書いている）`);
+    if (isSkill) {
+      const named = fm.match(/^name[ \t]*:[ \t]*(.*)$/m);
+      if (named) names.push(named[1].replace(/\s+#.*$/, "").trim().replace(/^(["'])(.*)\1$/, "$2"));
+    }
+    if (/hooks/i.test(fm)) {
+      exclude("hooks を書いている");
       continue;
     }
-    const named = isSkill ? fm.match(/^name\s*:\s*["']?([^"'\s#]+)/m) : null;
-    if (named) names.push(named[1]);
-    for (const n of names) {
-      if (/^[A-Za-z0-9_.:-]+$/.test(n)) allowed.add(n);
-      else excluded.push(`${f}（名前に許さない文字がある）`);
+    if (names.some((n) => !/^[A-Za-z0-9_.:-]+$/.test(n))) {
+      exclude("名前に許さない文字がある");
+      continue;
     }
+    for (const n of names) allowed.add(n);
   }
+  for (const n of blocked) allowed.delete(n);
   return { allowed: [...allowed].sort(), excluded };
 }
 
-/** 先頭の --- から次の --- までを返す。frontmatter が無ければ空、閉じていなければ null */
+/** 先頭の --- の行から次の --- の行までを返す。frontmatter が無ければ空、閉じていなければ null */
 function frontmatter(text) {
-  const t = text.replace(/^﻿/, "").replace(/\r\n/g, "\n");
-  if (!t.startsWith("---\n")) return "";
-  const rest = t.slice(4);
+  const t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+  const open = t.match(/^---[ \t]*\n/);
+  if (!open) return "";
+  const rest = t.slice(open[0].length);
   const end = rest.search(/^---[ \t]*$/m);
   return end < 0 ? null : rest.slice(0, end);
 }

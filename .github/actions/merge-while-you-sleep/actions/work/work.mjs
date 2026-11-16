@@ -877,6 +877,10 @@ async function modeWork() {
       if (depChanged.length) throw new Stop("outside_allowlist", "続きから進めるときに、PR のブランチの依存の定義が土台のコミットと違う", { keepChanges: false });
       await git(["checkout", "-q", "--detach", resume.head_sha]);
       await resetTree(ctx, resume.head_sha);
+      // 許すスキルは、土台と PR の先頭の両方で許せる名前だけ ── Claude Code が読むのは、PR の先頭の SKILL.md
+      const headSkills = baseSkills(ws, (await git(["ls-files", "-z"])).out.split("\0").filter(Boolean));
+      if (headSkills.excluded.length) log(`PR の先頭で許さないスキル: ${headSkills.excluded.join("、")}`);
+      ctx.skills = ctx.skills.filter((n) => headSkills.allowed.includes(n));
       ctx.start = resume.head_sha;
       ctx.reviewBase = base;
     }
