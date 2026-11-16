@@ -70,3 +70,42 @@ export function padLeft(s, n) {
   if (s.length >= n) return s;
   return " ".repeat(n - s.length) + s;
 }
+
+/**
+ * 空白の位置で width 文字以内に折り返す（行の区切りは \n）
+ * 続く空白は1つにまとめ、前後の空白は除く。width より長い語は width ごとに切る
+ * @param {string} s
+ * @param {number} width
+ * @returns {string}
+ */
+export function wrapA(s, width) {
+  if (!Number.isInteger(width) || width < 1) {
+    throw new RangeError("width は 1 以上の整数にする");
+  }
+  const trimmed = s.trim();
+  if (trimmed === "") return "";
+  const lines = [];
+  let current = "";
+  for (const word of trimmed.split(/\s+/)) {
+    const pieces = [];
+    if (word.length > width) {
+      for (let i = 0; i < word.length; i += width) {
+        pieces.push(word.slice(i, i + width));
+      }
+    } else {
+      pieces.push(word);
+    }
+    for (const w of pieces) {
+      if (current === "") {
+        current = w;
+      } else if (current.length + 1 + w.length <= width) {
+        current += " " + w;
+      } else {
+        lines.push(current);
+        current = w;
+      }
+    }
+  }
+  if (current !== "") lines.push(current);
+  return lines.join("\n");
+}
