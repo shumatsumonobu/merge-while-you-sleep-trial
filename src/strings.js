@@ -213,3 +213,37 @@ export function wrapG(s, width) {
   lines.push(current);
   return lines.join("\n");
 }
+
+/**
+ * 文字列を空白の位置で width 文字以内に折り返す。
+ * 行の区切りは "\n"。続く空白は1つにまとめ、前後の空白は除く。
+ * width より長い語は width ごとに切る。
+ * @param {string} s 折り返す文字列
+ * @param {number} width 1 行の最大文字数（1 以上の整数）
+ * @returns {string} 行を "\n" でつないだ文字列
+ * @throws {RangeError} width が 1 未満または整数でないとき
+ */
+export function wrapH(s, width) {
+  if (!Number.isInteger(width) || width < 1) {
+    throw new RangeError("width は 1 以上の整数にする");
+  }
+  const trimmed = s.trim();
+  if (trimmed === "") return "";
+  const lines = [];
+  let current = "";
+  for (const word of trimmed.split(/\s+/)) {
+    for (let i = 0; i < word.length; i += width) {
+      const piece = word.slice(i, i + width);
+      if (current === "") {
+        current = piece;
+      } else if (current.length + 1 + piece.length <= width) {
+        current += " " + piece;
+      } else {
+        lines.push(current);
+        current = piece;
+      }
+    }
+  }
+  lines.push(current);
+  return lines.join("\n");
+}
