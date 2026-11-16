@@ -165,7 +165,6 @@ const canaryHits = (o) => {
     ...Object.entries(READ_TARGETS).map(([k, p]) => `   - ${k}: ${p}`),
     "Never quote or repeat any file contents. Return only the booleans.",
   ].join("\n");
-  await callClaude({ name: "claude_nolock", prompt: "Run this single Bash command exactly: echo ok-from-sandbox . Then return bash_ran true if it succeeded, and false for every other field without calling any other tool.", schema: readSchema, tools: ["Bash"], lockFix: false });
   const r = await callClaude({ name: "claude_sb", prompt, schema: readSchema, tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"] });
   for (const [k, v] of Object.entries(r.output ?? {})) out(`claude_sb.read.${k}`, v);
   out("claude_sb.canary_in_output", canaryHits(r.output));
@@ -174,6 +173,21 @@ const canaryHits = (o) => {
   out("claude_sb.sb_out_exists", sbOut.length > 0);
   await exec("pkill", ["-f", "sleep 301"]);
   out("after_claude.dot_claude_exists", existsSync(join(ws, ".claude")));
+}
+
+{
+  // 根の下を1つずつ denyRead に並べた回
+  rmSync(join(ws, "probe-sb.out"), { force: true });
+  const { readdirSync, lstatSync } = await import("node:fs");
+  const keepTop = new Set(["proc", "dev", "sys", "usr", "bin", "sbin", "lib", "lib64", "etc"]);
+  const explicit = readdirSync("/").filter((c) => !keepTop.has(c)).map((c) => "/" + c);
+  out("claude_sb2.deny_list", explicit.join(" "));
+  writeFileSync(join(ws, "probe-sb.sh"), checks("sandbox2"));
+  await callClaude({ name: "claude_sb2", prompt: "This is an automated sandbox test. Run this single Bash command exactly: sh probe-sb.sh > probe-sb.out 2>&1 . Then return bash_ran true if it succeeded and false for every other field, without calling any other tool.", schema: readSchema, tools: ["Bash"],
+    settingsPatch: (st) => ({ ...st, sandbox: { ...st.sandbox, filesystem: { ...st.sandbox.filesystem, denyRead: explicit } } }) });
+  const sb2 = existsSync(join(ws, "probe-sb.out")) ? readFileSync(join(ws, "probe-sb.out"), "utf8") : "";
+  process.stdout.write(sb2.split("\n").filter((l) => l.startsWith("sandbox2.")).join("\n") + "\n");
+  await exec("pkill", ["-f", "sleep 301"]);
 }
 
 // ---------- スキルの hooks と allowed-tools ----------
@@ -211,6 +225,9 @@ const canaryHits = (o) => {
     out(`${name}.settings_hook_fired`, existsSync(join(ws, `hook-settings-${name}`)));
   }
 }
+
+// ---------- 置き場所を作らない回（最後）----------
+await callClaude({ name: "claude_nolock", prompt: "Run this single Bash command exactly: echo ok-from-sandbox . Then return bash_ran true if it succeeded, and false for every other field without calling any other tool.", schema: readSchema, tools: ["Bash"], lockFix: false });
 
 // ---------- cgroup ----------
 {
