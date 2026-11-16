@@ -30,9 +30,9 @@ export const CLAUDE_SHA256 = {
 
 const CLAUDE_URL = (v, p) => `https://downloads.claude.ai/claude-code-releases/${v}/${p}/claude`;
 
-// disableAllHooks がスキルの frontmatter の hooks も止めると、runner で確かめたら true にする
-// それまでは Skill を許さない（DESIGN.md の「変えさせないファイルは、書き込みを止める」）
-export const SKILL_HOOKS_VERIFIED = false;
+// disableAllHooks がスキルの frontmatter の hooks も止めることを、2.1.319 で runner で確かめた
+// 版を上げるときは確かめ直す。止めない版では false にし、Skill を許さない（DESIGN.md の「変えさせないファイルは、書き込みを止める」）
+export const SKILL_HOOKS_VERIFIED = true;
 
 // ---------- 既定値 ----------
 
@@ -211,7 +211,9 @@ export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWri
     },
     disableAllHooks: true,
     disableSkillShellExecution: true,
-    env: { CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1", DISABLE_UPDATES: "1", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
+    // CLAUDE_CODE_SUBPROCESS_ENV_SCRUB は使わない ── 2.1.319 では、あると sandbox.filesystem.denyRead が効かず、
+    // .git の中にマウントの先を作ろうとして sandbox のコマンドが起動しない（DESIGN.md の Claude Code に鍵を読ませない）
+    env: { DISABLE_UPDATES: "1", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" },
   };
   if (sandbox) {
     s.sandbox = {
@@ -222,6 +224,8 @@ export function buildSettings({ ws, runnerTemp, sandbox, readPaths = [], denyWri
       filesystem: {
         denyRead: ["/"],
         allowRead: [...GATE_SYSTEM_DIRS, ...readPaths, ws, "/proc", "/dev", tmp].map((p) => p.replace(/\/+$/, "")),
+        // 根の / を読めなくすると、sandbox の一時ディレクトリも読み取りだけになる。Claude Code が作業の記録をここに書くので戻す
+        allowWrite: [tmp.replace(/\/+$/, "")],
         denyWrite,
       },
       network: { allowedDomains: allowDomains },
@@ -368,8 +372,7 @@ async function killLeftovers(cg, before, rootPid) {
 
 /** Claude Code の配布物を取得し、SHA-256 を照合する */
 /**
- * bubblewrap を入れ、起動できるかを確かめる
- * Claude Code は CLAUDE_CODE_SUBPROCESS_ENV_SCRUB があると、bubblewrap が無ければ起動しない。下書きと作業のジョブで呼ぶ
+ * bubblewrap を入れ、起動できるかを確かめる。作業のジョブで呼ぶ（sandbox とゲートの隔離に使う）
  */
 export async function installBubblewrap({ extraPackages = [] } = {}) {
   const env = baseEnv({ DEBIAN_FRONTEND: "noninteractive" });
@@ -437,7 +440,6 @@ export function claudeEnv({ oauth, cfgDir, tmp, passEnv }) {
     CLAUDE_CODE_TMPDIR: tmp,
     CLAUDE_CONFIG_DIR: cfgDir,
     CLAUDE_CODE_OAUTH_TOKEN: oauth,
-    CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1",
     DISABLE_UPDATES: "1",
     CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
   };

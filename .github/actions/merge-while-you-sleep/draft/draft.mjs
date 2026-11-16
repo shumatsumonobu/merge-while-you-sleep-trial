@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { input, inputNumber, log, mask, runnerTemp, setOutput } from "../shared/actions.mjs";
-import { buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, runClaude, SCHEMAS, validate } from "../shared/claude.mjs";
+import { buildPrompt, buildSettings, claudeEnv, findHelpers, installClaude, runClaude, SCHEMAS, validate } from "../shared/claude.mjs";
 import { LIMITS, MODELS } from "../shared/defaults.mjs";
 import { comment, escalate, marker, readMarker, REASONS, Stop } from "../shared/escalation.mjs";
 import { sha256 } from "../shared/git.mjs";
@@ -72,7 +72,6 @@ async function modeDraft() {
   let claudePath;
   try {
     claudePath = await installClaude();
-    await installBubblewrap();
   } catch (e) {
     if (e instanceof Stop) return draftEscalate(e.reason, e.details);
     throw e;
