@@ -289,6 +289,16 @@ export function removeClaudeArtifacts(ws, before) {
   }
 }
 
+/**
+ * 工程が「進められない」と返したときの理由を、引き継ぎのコメントに添える形にする
+ * Claude Code の申告なので、判定には使わない。人が完了条件を直す手がかりにする。出す前に sanitizeOutbound を通る
+ */
+function claimedReason(rep) {
+  const r = String(rep?.reason ?? "").trim().slice(0, 1500);
+  return r ? `。理由（Claude Code の申告）:
+${codeBlock(r)}` : "";
+}
+
 async function callStage(ctx, stage, prompt) {
   checkLimits(ctx);
   await ctx.checkProtected();
@@ -430,7 +440,7 @@ async function freshFlow(ctx, { isTest }) {
   const plan = await callStage(ctx, "plan", buildPrompt("plan", { trusted: [criteria, ...outOfScope], untrusted: [title] }));
   await resetTree(ctx, ctx.start); // 計画の工程は読むだけ。何か変えていても捨てる
   if (plan.status === "cannot_proceed") {
-    throw new Stop(plan.reason_kind === "criteria_insufficient" ? "criteria_insufficient" : "undecidable", "計画の工程が、進められないと返した");
+    throw new Stop(plan.reason_kind === "criteria_insufficient" ? "criteria_insufficient" : "undecidable", `計画の工程が、進められないと返した${claimedReason(plan)}`);
   }
   const isProtected = matcher(PROTECTED_PATHS, { nocase: true });
   const protectedPlanned = plan.files.filter((f) => isProtected(f) || ctx.imports.has(f));
@@ -464,7 +474,7 @@ async function testStage(ctx, { prev, criteria, planText, title, isTest, extra =
     const rep = await callStage(ctx, "write_tests", buildPrompt("write_tests", { trusted: [criteria, planText, ["既存のテストのファイル（変えない）", [...ctx.baseTests].join("\n") || "なし"]].filter(Boolean), untrusted })); // 続きから進めるときは計画が無い
     if (rep.status === "already_satisfied") throw new Stop("no_change", "テスト作成の工程が「完了条件はすでに満たされている」と返した", { keepChanges: false });
     if (rep.status === "cannot_proceed") {
-      throw new Stop(rep.reason_kind === "criteria_insufficient" ? "criteria_insufficient" : "undecidable", "テスト作成の工程が、進められないと返した");
+      throw new Stop(rep.reason_kind === "criteria_insufficient" ? "criteria_insufficient" : "undecidable", `テスト作成の工程が、進められないと返した${claimedReason(rep)}`);
     }
     const sha = await commitStage(ctx, "write_tests");
     if (sha !== prev) ctx.state.claudeChanged = true;
@@ -526,7 +536,7 @@ async function implementLoop(ctx, { prev, criteria, planText, title, isTest, res
             continue;
           }
           if (rep.reason_kind === "tests_wrong") throw new Stop("limit_reached", "テスト作成に戻す上限に達した");
-          throw new Stop(rep.reason_kind === "criteria_insufficient" ? "criteria_insufficient" : "undecidable", `工程 ${stage} が、進められないと返した`);
+          throw new Stop(rep.reason_kind === "criteria_insufficient" ? "criteria_insufficient" : "undecidable", `工程 ${stage} が、進められないと返した${claimedReason(rep)}`);
         }
         const before = sha;
         sha = await commitStage(ctx, stage);
