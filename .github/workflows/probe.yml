@@ -2,6 +2,10 @@
 name: probe
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -14,4 +18,5 @@ jobs:
           persist-credentials: false
       - run: node .github/probe/probe.mjs
         env:
+          ONLY: ${{ inputs.only }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

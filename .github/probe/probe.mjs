@@ -82,7 +82,7 @@ r spawned_bg "yes"
 `;
 
 // ---------- ゲートの隔離 ----------
-{
+if (!process.env.ONLY) {
   writeFileSync(join(temp, "gate.sh"), checks("gate"));
   const bw = bwrapArgs({ ws, readOnlyInWs: [".git", "node_modules"], readPaths: [], network: false, home });
   const g = await exec("bwrap", [...bw, "--ro-bind", join(temp, "gate.sh"), "/gate.sh", "--", "/bin/sh", "/gate.sh"], { cwd: ws, env: gateEnv([]), timeout: 300000 });
@@ -156,7 +156,7 @@ const canaryHits = (o) => {
   return Object.entries(C).filter(([, v]) => s.includes(v)).map(([k]) => k).join(",") || "none";
 };
 
-{
+if (!process.env.ONLY) {
   writeFileSync(join(ws, "probe-sb.sh"), checks("sandbox"));
   const prompt = [
     "This is an automated sandbox test. Do exactly the following, nothing else.",
@@ -175,7 +175,7 @@ const canaryHits = (o) => {
   out("after_claude.dot_claude_exists", existsSync(join(ws, ".claude")));
 }
 
-{
+if (!process.env.ONLY) {
   // 根の下を1つずつ denyRead に並べた回
   rmSync(join(ws, "probe-sb.out"), { force: true });
   const { readdirSync, lstatSync } = await import("node:fs");
@@ -194,17 +194,14 @@ const canaryHits = (o) => {
 // ---------- denyRead の効き方を比べる ----------
 {
   const optSchema = { type: "object", additionalProperties: false, required: ["bash_ran"], properties: { bash_ran: { type: "boolean" } } };
-  const optPrompt = "Automated test. Run this single Bash command exactly: sh -c 'grep -c c-opt /opt/probe-canary.txt; grep -c c-tmp /tmp/probe-canary.txt; ls /srv >/dev/null 2>&1 && echo srv-ok || echo srv-no' > opt.out 2>&1 . Then return bash_ran true if the Bash call itself ran. Call no other tool.";
+  const optPrompt = "Automated test. Run this single Bash command exactly: sh -c 'grep -c c-opt /opt/probe-canary.txt; grep -c c-tmp /tmp/probe-canary.txt; ls /srv >/dev/null 2>&1 && echo srv-ok || echo srv-no; ls -d /opt/* 2>&1 | head -2; echo tmpwrite; touch $TMPDIR/x && echo tmpdir-ok || echo tmpdir-no' > opt.out 2>&1 . Then return bash_ran true if the Bash call itself ran. Call no other tool.";
   const fsPatch = (fs) => (st) => ({ ...st, sandbox: { ...st.sandbox, filesystem: fs(st.sandbox.filesystem) } });
   const noScrubEnv = (e) => { const x = { ...e }; delete x.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; return x; };
   const noScrubSettings = (st) => { const x = { ...st, env: { ...st.env } }; delete x.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; return x; };
+  const rules = (...r) => (st) => ({ ...st, permissions: { ...st.permissions, deny: [...st.permissions.deny, ...r] } });
   const V = [
-    ["v_current", (st) => st, (e) => e],
-    ["v_opt_only", fsPatch((f) => ({ denyRead: ["/opt", "/tmp"], denyWrite: f.denyWrite })), (e) => e],
-    ["v_opt_with_allow", fsPatch((f) => ({ ...f, denyRead: ["/opt", "/tmp"] })), (e) => e],
-    ["v_noscrub_root", (st) => noScrubSettings(st), noScrubEnv],
-    ["v_noscrub_opt", (st) => fsPatch((f) => ({ denyRead: ["/opt", "/tmp"], denyWrite: f.denyWrite }))(noScrubSettings(st)), noScrubEnv],
-    ["v_rule_opt", (st) => ({ ...st, permissions: { ...st.permissions, deny: [...st.permissions.deny, "Read(//opt/**)", "Read(//tmp/probe-canary.txt)"] } }), (e) => e],
+    ["v_rule_dir", rules("Read(//opt)", "Read(//srv/)"), (e) => e],
+    ["v_rule_tmp_dir", rules("Read(//opt)", "Read(//tmp)"), (e) => e],
   ];
   for (const [name, sp, ep] of V) {
     rmSync(join(ws, "opt.out"), { force: true });
@@ -214,7 +211,7 @@ const canaryHits = (o) => {
 }
 
 // ---------- スキルの hooks と allowed-tools ----------
-{
+if (!process.env.ONLY) {
   const skSchema = { type: "object", additionalProperties: false, required: ["skill_invoked", "bash_ran", "tmp_direct", "link_tmp"],
     properties: { skill_invoked: { type: "boolean" }, bash_ran: { type: "boolean" }, tmp_direct: { type: "boolean" }, link_tmp: { type: "boolean" } } };
   const prompt = "This is an automated test. Invoke the skill named probe with the Skill tool and follow its instructions exactly. Never quote file contents. Return only the booleans.";
@@ -250,7 +247,7 @@ const canaryHits = (o) => {
 }
 
 // ---------- 置き場所を作らない回（最後）----------
-await callClaude({ name: "claude_nolock", prompt: "Run this single Bash command exactly: echo ok-from-sandbox . Then return bash_ran true if it succeeded, and false for every other field without calling any other tool.", schema: readSchema, tools: ["Bash"], lockFix: false });
+if (!process.env.ONLY) await callClaude({ name: "claude_nolock", prompt: "Run this single Bash command exactly: echo ok-from-sandbox . Then return bash_ran true if it succeeded, and false for every other field without calling any other tool.", schema: readSchema, tools: ["Bash"], lockFix: false });
 
 // ---------- cgroup ----------
 {
