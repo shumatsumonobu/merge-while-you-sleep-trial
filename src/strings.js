@@ -14,11 +14,13 @@ export function slugify(s) {
 
 /**
  * n 文字を超えたら、n 文字に切って末尾を … にする
+ * n が 0 以下なら空文字を返す
  * @param {string} s
  * @param {number} n
  * @returns {string}
  */
 export function truncate(s, n) {
+  if (n <= 0) return "";
   if (s.length <= n) return s;
   return s.slice(0, n - 1) + "…";
 }
