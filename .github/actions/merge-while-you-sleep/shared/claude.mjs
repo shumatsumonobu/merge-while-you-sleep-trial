@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { runnerTemp } from "./actions.mjs";
 import { Stop } from "./escalation.mjs";
 import { sha256 } from "./git.mjs";
-import { baseEnv, exec } from "./process.mjs";
+import { baseEnv, exec, which } from "./process.mjs";
 import { GATE_SYSTEM_DIRS, gateEnv } from "../work/work.mjs";
 
 // このリポジトリの根（prompts/ を読む）
@@ -345,6 +345,26 @@ async function killLeftovers(cg, before, rootPid) {
 // ---------- 作業のジョブの外側（準備、bundle、出力）----------
 
 /** Claude Code の配布物を取得し、SHA-256 を照合する */
+/**
+ * bubblewrap を入れ、起動できるかを確かめる
+ * Claude Code は CLAUDE_CODE_SUBPROCESS_ENV_SCRUB があると、bubblewrap が無ければ起動しない。下書きと作業のジョブで呼ぶ
+ */
+export async function installBubblewrap({ extraPackages = [] } = {}) {
+  const env = baseEnv({ DEBIAN_FRONTEND: "noninteractive" });
+  const missing = [];
+  if (!(await which("bwrap"))) missing.push("bubblewrap");
+  for (const p of extraPackages) if (!(await which(p))) missing.push(p);
+  if (missing.length) {
+    await exec("sudo", ["-n", "apt-get", "update", "-qq"], { env, timeout: 300000 });
+    const r = await exec("sudo", ["-n", "apt-get", "install", "-y", "-qq", ...missing], { env, timeout: 300000 });
+    if (r.code !== 0) throw new Stop("cannot_start", `${missing.join(" と ")} を入れられない`);
+  }
+  // Ubuntu 24.04 は、権限の無い user namespace を AppArmor で止める（claude-code-action も同じ設定を変えている）
+  await exec("sudo", ["-n", "sysctl", "-w", "kernel.apparmor_restrict_unprivileged_userns=0"], { env });
+  const probe = await exec("bwrap", ["--ro-bind", "/", "/", "--unshare-net", "--die-with-parent", "true"], { env: baseEnv() });
+  if (probe.code !== 0) throw new Stop("cannot_start", "bubblewrap が起動できない");
+}
+
 export async function installClaude() {
   const plat = process.arch === "arm64" ? "linux-arm64" : "linux-x64";
   const dir = join(runnerTemp(), "merge-while-you-sleep", "bin");

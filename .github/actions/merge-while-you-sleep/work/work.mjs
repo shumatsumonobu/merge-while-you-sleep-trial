@@ -10,13 +10,13 @@ import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, re
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getState, input, inputBool, inputNumber, log, mask, runnerTemp, saveState, setOutput, splitList } from "../shared/actions.mjs";
-import { buildPrompt, buildSettings, claudeEnv, findHelpers, installClaude, killAllCgroups, runClaude, SCHEMAS, SKILL_HOOKS_VERIFIED, validate } from "../shared/claude.mjs";
+import { buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, killAllCgroups, runClaude, SCHEMAS, SKILL_HOOKS_VERIFIED, validate } from "../shared/claude.mjs";
 import { LIMITS, MODELS } from "../shared/defaults.mjs";
 import { comment, escalate, marker, REASONS, Stop } from "../shared/escalation.mjs";
 import { diffEntries, fetchRef, makeGit, sha256 } from "../shared/git.mjs";
 import { labels, makeGitHub, repoFromEnv, runUrl, triggerLabelIfOurs } from "../shared/github.mjs";
 import { DEPENDENCY_PATHS, extractImports, FIXED_DENY_PATHS, matcher, PROTECTED_PATHS, resolveImport, testPaths } from "../shared/paths.mjs";
-import { baseEnv, exec, which } from "../shared/process.mjs";
+import { baseEnv, exec } from "../shared/process.mjs";
 import { sanitizeOutbound } from "../shared/sanitize.mjs";
 
 // このリポジトリの根（deps/sandbox-runtime/ を読む）
@@ -603,13 +603,7 @@ async function resumeFlow(ctx, { isTest }) {
 /** sandbox に要るもの（bubblewrap、socat、seccomp フィルタ）を入れて確かめる */
 async function installSandboxDeps() {
   const env = baseEnv({ DEBIAN_FRONTEND: "noninteractive" });
-  if (!(await which("bwrap")) || !(await which("socat"))) {
-    await exec("sudo", ["-n", "apt-get", "update", "-qq"], { env, timeout: 300000 });
-    const r = await exec("sudo", ["-n", "apt-get", "install", "-y", "-qq", "bubblewrap", "socat"], { env, timeout: 300000 });
-    if (r.code !== 0) throw new Stop("cannot_start", "bubblewrap と socat を入れられない");
-  }
-  // Ubuntu 24.04 は、権限の無い user namespace を AppArmor で止める（claude-code-action も同じ設定を変えている）
-  await exec("sudo", ["-n", "sysctl", "-w", "kernel.apparmor_restrict_unprivileged_userns=0"], { env });
+  await installBubblewrap({ extraPackages: ["socat"] });
   // seccomp フィルタ: action に持たせた package-lock.json で入れる。install のスクリプトは実行しない
   const work = join(runnerTemp(), "merge-while-you-sleep", "srt");
   mkdirSync(work, { recursive: true });
@@ -626,8 +620,6 @@ async function installSandboxDeps() {
   const arch = process.arch === "arm64" ? "arm64" : "x64";
   const bin = `${dest}/sandbox-runtime/vendor/seccomp/${arch}/apply-seccomp`;
   if (cp.code !== 0 || !existsSync(bin)) throw new Stop("cannot_start", "seccomp フィルタが無い");
-  const probe = await exec("bwrap", ["--ro-bind", "/", "/", "--unshare-net", "--die-with-parent", "true"], { env: baseEnv() });
-  if (probe.code !== 0) throw new Stop("cannot_start", "bubblewrap が起動できない");
 }
 
 /** 作業の最初に作業ディレクトリにあった、git の管理の外のファイルを、workspace_keep のほかは外へ移す */

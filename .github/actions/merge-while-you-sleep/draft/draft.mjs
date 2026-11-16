@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { input, inputNumber, log, mask, runnerTemp, setOutput } from "../shared/actions.mjs";
-import { buildPrompt, buildSettings, claudeEnv, findHelpers, installClaude, runClaude, SCHEMAS, validate } from "../shared/claude.mjs";
+import { buildPrompt, buildSettings, claudeEnv, findHelpers, installBubblewrap, installClaude, runClaude, SCHEMAS, validate } from "../shared/claude.mjs";
 import { LIMITS, MODELS } from "../shared/defaults.mjs";
 import { comment, escalate, marker, readMarker, REASONS, Stop } from "../shared/escalation.mjs";
 import { sha256 } from "../shared/git.mjs";
@@ -69,7 +69,14 @@ async function modeDraft() {
     return draftEscalate("criteria_insufficient", `下書きの質問が上限（${asked}回）に達した`);
   }
 
-  const claudePath = await installClaude();
+  let claudePath;
+  try {
+    claudePath = await installClaude();
+    await installBubblewrap();
+  } catch (e) {
+    if (e instanceof Stop) return draftEscalate(e.reason, e.details);
+    throw e;
+  }
   const ws = process.env.GITHUB_WORKSPACE;
   const oauth = input("claude_code_oauth_token");
   mask(oauth);
