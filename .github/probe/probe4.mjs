@@ -111,6 +111,11 @@ const S = (props) => ({ type: "object", additionalProperties: false, required: O
     "r d_symlink_github \"$(ln -s /tmp .github 2>&1 && echo created)\"",
     "r e_go \"$(cd g && go build -o /dev/null . 2>&1 | tail -1; echo rc=$?)\"",
     "r e_cargo \"$(command -v cargo || echo none)\"",
+    "r e_path \"$PATH\"",
+    "r e_home \"$HOME\"",
+    "r e_cargo_ls \"$(ls -la /home/runner/.cargo/bin 2>&1 | head -4 | tr '\n' ' ')\"",
+    "r e_rustup_ls \"$(ls /home/runner/.rustup 2>&1 | head -3 | tr '\n' ' ')\"",
+    "r e_cargo_run \"$(/home/runner/.cargo/bin/cargo --version 2>&1 | tail -1)\"",
     "r e_npm \"$(npm -v 2>&1)\"",
   ].join("\n");
   writeFileSync(join(ws, "probe.sh"), script + "\n");
