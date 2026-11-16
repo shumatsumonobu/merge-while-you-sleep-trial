@@ -93,7 +93,7 @@ r spawned_bg "yes"
 }
 
 // ---------- Claude Code の sandbox ----------
-async function callClaude({ name, prompt, schema, tools, skills = [], settingsPatch = (s) => s, lockFix = true }) {
+async function callClaude({ name, prompt, schema, tools, skills = [], settingsPatch = (s) => s, lockFix = true, envPatch = (e) => e }) {
   const cfgDir = mkdtempSync(join(temp, "claude-config-"));
   const tmp = mkdtempSync("/tmp/mwys-probe-");
   let settings = buildSettings({
@@ -104,7 +104,7 @@ async function callClaude({ name, prompt, schema, tools, skills = [], settingsPa
   settings = settingsPatch(settings);
   const sf = join(cfgDir, "settings.json");
   writeFileSync(sf, JSON.stringify(settings));
-  const env = claudeEnv({ oauth, cfgDir, tmp, passEnv: [] });
+  const env = envPatch(claudeEnv({ oauth, cfgDir, tmp, passEnv: [] }));
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--json-schema", JSON.stringify(schema), "--model", "claude-sonnet-5-5",
     "--permission-mode", "dontAsk", "--settings", sf, "--tools", tools.join(","), "--allowedTools", tools.join(","),
     "--strict-mcp-config", "--disallowedTools", "mcp__*", "--max-budget-usd", "0.80", "--no-session-persistence"];
@@ -188,6 +188,29 @@ const canaryHits = (o) => {
   const sb2 = existsSync(join(ws, "probe-sb.out")) ? readFileSync(join(ws, "probe-sb.out"), "utf8") : "";
   process.stdout.write(sb2.split("\n").filter((l) => l.startsWith("sandbox2.")).join("\n") + "\n");
   await exec("pkill", ["-f", "sleep 301"]);
+}
+
+
+// ---------- denyRead の効き方を比べる ----------
+{
+  const optSchema = { type: "object", additionalProperties: false, required: ["bash_ran"], properties: { bash_ran: { type: "boolean" } } };
+  const optPrompt = "Automated test. Run this single Bash command exactly: sh -c 'grep -c c-opt /opt/probe-canary.txt; grep -c c-tmp /tmp/probe-canary.txt; ls /srv >/dev/null 2>&1 && echo srv-ok || echo srv-no' > opt.out 2>&1 . Then return bash_ran true if the Bash call itself ran. Call no other tool.";
+  const fsPatch = (fs) => (st) => ({ ...st, sandbox: { ...st.sandbox, filesystem: fs(st.sandbox.filesystem) } });
+  const noScrubEnv = (e) => { const x = { ...e }; delete x.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; return x; };
+  const noScrubSettings = (st) => { const x = { ...st, env: { ...st.env } }; delete x.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; return x; };
+  const V = [
+    ["v_current", (st) => st, (e) => e],
+    ["v_opt_only", fsPatch((f) => ({ denyRead: ["/opt", "/tmp"], denyWrite: f.denyWrite })), (e) => e],
+    ["v_opt_with_allow", fsPatch((f) => ({ ...f, denyRead: ["/opt", "/tmp"] })), (e) => e],
+    ["v_noscrub_root", (st) => noScrubSettings(st), noScrubEnv],
+    ["v_noscrub_opt", (st) => fsPatch((f) => ({ denyRead: ["/opt", "/tmp"], denyWrite: f.denyWrite }))(noScrubSettings(st)), noScrubEnv],
+    ["v_rule_opt", (st) => ({ ...st, permissions: { ...st.permissions, deny: [...st.permissions.deny, "Read(//opt/**)", "Read(//tmp/probe-canary.txt)"] } }), (e) => e],
+  ];
+  for (const [name, sp, ep] of V) {
+    rmSync(join(ws, "opt.out"), { force: true });
+    await callClaude({ name, prompt: optPrompt, schema: optSchema, tools: ["Bash"], settingsPatch: sp, envPatch: ep });
+    out(`${name}.result`, existsSync(join(ws, "opt.out")) ? readFileSync(join(ws, "opt.out"), "utf8").replace(/\s+/g, " ").trim() : "no-output");
+  }
 }
 
 // ---------- スキルの hooks と allowed-tools ----------
