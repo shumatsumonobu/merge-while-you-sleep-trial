@@ -77,6 +77,7 @@ d=$(mktemp -d)
 ( mkdir -p $d/g && cd $d/g && printf 'module p\\ngo 1.21\\n' > go.mod && printf 'package main\\nfunc main(){}\\n' > m.go && go build -o /dev/null . >$d/go.log 2>&1 && echo ok || echo "fail:$(head -c 160 $d/go.log | tr '\\n' ' ')" ) | { read v; r tool_go_build "$v"; }
 ( cd $d && cargo new --vcs none c >/dev/null 2>&1 && cd c && cargo build --offline >$d/c.log 2>&1 && echo ok || echo "fail:$(head -c 160 $d/c.log 2>/dev/null | tr '\\n' ' ')" ) | { read v; r tool_cargo_build "$v"; }
 setsid sleep 301 >/dev/null 2>&1 < /dev/null &
+for t in /*; do if ls "$t" >/dev/null 2>&1; then printf '%s ' "$t"; fi; done | { read v; r readable_top "$v"; }
 r spawned_bg "yes"
 `;
 
@@ -113,8 +114,12 @@ async function callClaude({ name, prompt, schema, tools, skills = [], settingsPa
     const pth = join(ws, ".git", f);
     if (!existsSync(pth)) { mkdirSync(join(pth, ".."), { recursive: true }); writeFileSync(pth, ""); made.push(pth); }
   }
+  const gitLs = async () => (await exec("sh", ["-c", "cd .git && find . -maxdepth 2 -newer HEAD -o -maxdepth 1 -empty | sort | tr '\n' ' '"], { cwd: ws })).out.trim();
+  out(`${name}.git_before`, (await exec("sh", ["-c", "ls -A .git | tr '\n' ' '"], { cwd: ws })).out.trim());
   out(`${name}.placeholders`, made.map((x) => x.slice(ws.length + 1)).join(",") || "none");
   const r = await exec(claudePath, args, { cwd: ws, env, input: prompt, timeout: 600000 });
+  out(`${name}.git_after_call`, (await exec("sh", ["-c", "ls -A .git | tr '\n' ' '"], { cwd: ws })).out.trim());
+  out(`${name}.root_after_call`, (await exec("sh", ["-c", "ls -A | tr '\n' ' '"], { cwd: ws })).out.trim());
   for (const pth of made) rmSync(pth, { force: true });
   const redact = (t) => { let x = String(t ?? ""); for (const v of Object.values(C)) x = x.split(v).join("<canary>"); return x.replace(/\s+/g, " ").slice(0, 160); };
   const pending = new Map();
