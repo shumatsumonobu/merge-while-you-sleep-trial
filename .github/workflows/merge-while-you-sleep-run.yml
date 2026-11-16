@@ -56,7 +56,7 @@ jobs:
       resume: ${{ steps.preflight.outputs.resume }}
     steps:
       - id: preflight
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/preflight@dcf46dd934844c49f03ff621f01f3248f1a8ddfe
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/preflight@0904360ef26cf66bd283a578e842683bfdc7a984
         with:
           app_client_id: ${{ vars.APP_CLIENT_ID }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -91,7 +91,7 @@ jobs:
       - run: npm ci
       # ---- ここまで ----
       - id: work
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/work@dcf46dd934844c49f03ff621f01f3248f1a8ddfe
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/work@0904360ef26cf66bd283a578e842683bfdc7a984
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           test_command: npm test
@@ -131,7 +131,7 @@ jobs:
           name: merge-while-you-sleep-bundle
           path: ${{ runner.temp }}/merge-while-you-sleep-bundle
       - id: submit
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/submit@dcf46dd934844c49f03ff621f01f3248f1a8ddfe
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/submit@0904360ef26cf66bd283a578e842683bfdc7a984
         with:
           app_client_id: ${{ vars.APP_CLIENT_ID }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -154,7 +154,7 @@ jobs:
       pull-requests: read
       actions: read
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@dcf46dd934844c49f03ff621f01f3248f1a8ddfe
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/cleanup@0904360ef26cf66bd283a578e842683bfdc7a984
         with:
           target: run
           needs: ${{ toJSON(needs) }}
