@@ -1,4 +1,4 @@
-// shared/sanitize.mjs — 文面の消毒（見えない文字、メンション、Issue を閉じる語、リンク、鍵の値）
+// lib/sanitize.mjs — 文面の消毒（見えない文字、メンション、Issue を閉じる語、リンク、鍵の値）
 
 
 

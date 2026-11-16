@@ -1,11 +1,11 @@
-// notify/notify.mjs — 順番待ちの通知の action の本体
+// actions/notify/notify.mjs — 順番待ちの通知の action の本体
 //
 // 起動ラベルが付いたら、すぐ「順番待ちに入った」とコメントする
 
 import { pathToFileURL } from "node:url";
-import { input, log } from "../shared/actions.mjs";
-import { comment, marker } from "../shared/escalation.mjs";
-import { labels, makeGitHub, permissionOf, readEvent, repoFromEnv } from "../shared/github.mjs";
+import { input, log } from "../../lib/actions.mjs";
+import { comment, marker } from "../../lib/escalation.mjs";
+import { labels, makeGitHub, permissionOf, readEvent, repoFromEnv } from "../../lib/github.mjs";
 
 // ---------- 順番待ちの通知 ----------
 

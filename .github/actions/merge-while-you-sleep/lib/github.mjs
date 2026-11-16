@@ -1,4 +1,4 @@
-// shared/github.mjs — GitHub の API の呼び方、イベント、ラベルの名前、権限とラベルのイベントの確かめ
+// lib/github.mjs — GitHub の API の呼び方、イベント、ラベルの名前、権限とラベルのイベントの確かめ
 
 import { readFileSync } from "node:fs";
 

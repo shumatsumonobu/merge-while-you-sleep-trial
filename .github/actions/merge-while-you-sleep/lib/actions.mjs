@@ -1,4 +1,4 @@
-// shared/actions.mjs — GitHub Actions とのやりとり（入力、出力、状態、ログ、伏せ字、RUNNER_TEMP）
+// lib/actions.mjs — GitHub Actions とのやりとり（入力、出力、状態、ログ、伏せ字、RUNNER_TEMP）
 
 import { appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";

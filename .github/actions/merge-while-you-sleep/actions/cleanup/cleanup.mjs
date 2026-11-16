@@ -1,11 +1,11 @@
-// cleanup/cleanup.mjs — 終わりの確認の action の本体
+// actions/cleanup/cleanup.mjs — 終わりの確認の action の本体
 //
 // ほかのジョブが、引き継ぎも提出の完了もせずに終わったとき、人に引き継ぐ
 
 import { pathToFileURL } from "node:url";
-import { input, log } from "../shared/actions.mjs";
-import { escalate } from "../shared/escalation.mjs";
-import { labels, latestLabeledEvent, makeGitHub, readEvent, repoFromEnv, triggerLabelIfOurs } from "../shared/github.mjs";
+import { input, log } from "../../lib/actions.mjs";
+import { escalate } from "../../lib/escalation.mjs";
+import { labels, latestLabeledEvent, makeGitHub, readEvent, repoFromEnv, triggerLabelIfOurs } from "../../lib/github.mjs";
 
 // ---------- 終わりの確認 ----------
 

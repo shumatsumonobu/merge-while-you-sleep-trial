@@ -1,4 +1,4 @@
-// shared/process.mjs — 子プロセスの起動と、子プロセスに渡す環境変数
+// lib/process.mjs — 子プロセスの起動と、子プロセスに渡す環境変数
 
 import { spawn } from "node:child_process";
 import { input } from "./actions.mjs";
@@ -63,4 +63,26 @@ export function baseEnv(extra = {}) {
 export async function which(cmd) {
   const r = await exec("sh", ["-c", `command -v ${cmd}`], { env: baseEnv() });
   return r.code === 0 ? r.out.trim() : null;
+}
+
+// ---------- ゲートと Claude Code に渡す環境変数 ----------
+
+export const GATE_ENV_NAMES = [
+  "PATH", "HOME", "LANG", "LC_ALL", "TERM", "CI", "JAVA_HOME", "GOROOT", "GOPATH", "pythonLocation", "PKG_CONFIG_PATH",
+];
+
+const NEVER_PASS = (name) =>
+  name.startsWith("INPUT_") || name.startsWith("ACTIONS_") ||
+  ["GITHUB_TOKEN", "GH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"].includes(name);
+
+export const GATE_SYSTEM_DIRS = ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc"];
+
+export function gateEnv(passEnv) {
+  const env = {};
+  for (const n of [...GATE_ENV_NAMES, ...passEnv]) {
+    if (NEVER_PASS(n)) continue;
+    if (process.env[n] !== undefined) env[n] = process.env[n];
+  }
+  env.TMPDIR = "/tmp";
+  return env;
 }

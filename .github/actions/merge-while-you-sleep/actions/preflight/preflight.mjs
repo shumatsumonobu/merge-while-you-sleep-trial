@@ -1,16 +1,16 @@
-// preflight/preflight.mjs — 開始の確認の action の本体
+// actions/preflight/preflight.mjs — 開始の確認の action の本体
 //
 // 権限、設定、承認を確かめ、承認を記録し、土台のコミットを決める。続きから進める PR も探す
 // App の秘密鍵を扱う。Claude Code も、対象プロジェクトのコードも実行しない（DESIGN.md の骨格の形）
 
 import { pathToFileURL } from "node:url";
 import { inflateRawSync } from "node:zlib";
-import { input, log, setOutput } from "../shared/actions.mjs";
-import { comment, escalate, Halt, marker, readMarker, REASONS, removeLabel } from "../shared/escalation.mjs";
-import { sha256 } from "../shared/git.mjs";
-import { labels, latestLabeledEvent, makeGitHub, permissionOf, readEvent, repoFromEnv } from "../shared/github.mjs";
-import { tokenSourceFromInputs } from "../shared/pr-token.mjs";
-import { codeBlock, scrubSecrets, stripInvisible } from "../shared/sanitize.mjs";
+import { input, log, setOutput } from "../../lib/actions.mjs";
+import { comment, escalate, Halt, marker, readMarker, REASONS, removeLabel } from "../../lib/escalation.mjs";
+import { sha256 } from "../../lib/git.mjs";
+import { labels, latestLabeledEvent, makeGitHub, permissionOf, readEvent, repoFromEnv } from "../../lib/github.mjs";
+import { tokenSourceFromInputs } from "../../lib/pr-token.mjs";
+import { codeBlock, scrubSecrets, stripInvisible } from "../../lib/sanitize.mjs";
 
 const PREFLIGHT_PERMISSIONS = { contents: "write", pull_requests: "write", actions: "write", administration: "read" };
 

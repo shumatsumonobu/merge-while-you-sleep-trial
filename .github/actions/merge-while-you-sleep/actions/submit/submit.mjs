@@ -1,4 +1,4 @@
-// submit/submit.mjs — 提出の action の本体
+// actions/submit/submit.mjs — 提出の action の本体
 //
 // bundle を取り込んで確かめ直し、push、PR の作成、自動マージの予約、CI を待つ
 // App の秘密鍵を扱う。Claude Code も、対象プロジェクトのコードも実行しない（DESIGN.md の骨格の形）
@@ -7,14 +7,14 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { input, inputBool, log, setOutput, splitList } from "../shared/actions.mjs";
-import { DEFAULT_DELETED_PATTERNS, DEFAULT_DENY_PATTERNS, scanDiffText } from "../shared/diff-scan.mjs";
-import { comment, escalate, Halt, marker, REASONS, removeLabel } from "../shared/escalation.mjs";
-import { diffEntries, fetchRef, makeGit } from "../shared/git.mjs";
-import { labels, makeGitHub, repoFromEnv, runUrl, triggerLabelIfOurs } from "../shared/github.mjs";
-import { extractImports, FIXED_DENY_PATHS, matcher, PROTECTED_PATHS, resolveImport, testPaths } from "../shared/paths.mjs";
-import { tokenSourceFromInputs } from "../shared/pr-token.mjs";
-import { codeBlock, hasClosingOrMention, sanitizeOutbound, scrubSecrets } from "../shared/sanitize.mjs";
+import { input, inputBool, log, setOutput, splitList } from "../../lib/actions.mjs";
+import { DEFAULT_DELETED_PATTERNS, DEFAULT_DENY_PATTERNS, scanDiffText } from "../../lib/diff-scan.mjs";
+import { comment, escalate, Halt, marker, REASONS, removeLabel } from "../../lib/escalation.mjs";
+import { diffEntries, fetchRef, makeGit } from "../../lib/git.mjs";
+import { labels, makeGitHub, repoFromEnv, runUrl, triggerLabelIfOurs } from "../../lib/github.mjs";
+import { extractImports, FIXED_DENY_PATHS, matcher, PROTECTED_PATHS, resolveImport, testPaths } from "../../lib/paths.mjs";
+import { tokenSourceFromInputs } from "../../lib/pr-token.mjs";
+import { codeBlock, hasClosingOrMention, sanitizeOutbound, scrubSecrets } from "../../lib/sanitize.mjs";
 
 const SUBMIT_PERMISSIONS = { contents: "write", pull_requests: "write", actions: "write" };
 

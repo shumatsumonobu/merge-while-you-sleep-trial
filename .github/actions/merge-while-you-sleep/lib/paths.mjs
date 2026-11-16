@@ -1,4 +1,4 @@
-// shared/paths.mjs — パスのパターン（テストのファイル、変えさせないファイル、依存の定義、必ず外すファイル）と、CLAUDE.md と AGENTS.md の @ の取り込み
+// lib/paths.mjs — パスのパターン（テストのファイル、変えさせないファイル、依存の定義、必ず外すファイル）と、CLAUDE.md と AGENTS.md の @ の取り込み
 
 import { splitList } from "./actions.mjs";
 
@@ -70,6 +70,8 @@ export const DEPENDENCY_PATHS = [
 export const FIXED_DENY_PATHS = [
   ...PROTECTED_PATHS,
   "**/CODEOWNERS",
+  // ほかのコーディングエージェントへの指示（Claude Code は読まないので、変えさせないファイルには入れない）
+  "**/GEMINI.md",
   // テストの設定と、全部のテストに効くファイル
   "**/jest.config.*", "**/jest.preset.*", "**/vitest.config.*", "**/vitest.workspace.*", "**/pytest.ini", "**/.pytest.ini",
   "**/conftest.py", "**/sitecustomize.py", "**/usercustomize.py", "**/.mocharc", "**/.mocharc.*",

@@ -1,4 +1,4 @@
-// shared/git.mjs — git の呼び方（hooks と外部の差分のコマンドを止めた設定）、差分の読み方、ref の取得
+// lib/git.mjs — git の呼び方（hooks と外部の差分のコマンドを止めた設定）、差分の読み方、ref の取得
 
 import { createHash } from "node:crypto";
 import { repoFromEnv } from "./github.mjs";
