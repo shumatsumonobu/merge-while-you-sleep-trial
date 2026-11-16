@@ -58,3 +58,15 @@ export function repeat(s, n) {
 export function kebab(s) {
   return s.toLowerCase().replace(/\s+/g, "-");
 }
+
+/**
+ * 左に半角スペースを足して n 文字にする
+ * s.length が n 以上なら s をそのまま返す
+ * @param {string} s
+ * @param {number} n
+ * @returns {string}
+ */
+export function padLeft(s, n) {
+  if (s.length >= n) return s;
+  return " ".repeat(n - s.length) + s;
+}
