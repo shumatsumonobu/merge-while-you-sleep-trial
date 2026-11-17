@@ -17,10 +17,12 @@ import { diffEntries, fetchRef, makeGit, sha256 } from "../../lib/git.mjs";
 import { labels, makeGitHub, repoFromEnv, runUrl, triggerLabelIfOurs } from "../../lib/github.mjs";
 import { DEPENDENCY_PATHS, extractImports, FIXED_DENY_PATHS, matcher, PROTECTED_PATHS, resolveImport, testPaths } from "../../lib/paths.mjs";
 import { baseEnv, exec, GATE_SYSTEM_DIRS, gateEnv } from "../../lib/process.mjs";
-import { codeBlock, sanitizeOutbound } from "../../lib/sanitize.mjs";
+import { codeBlock, sanitizeOutbound, scrubSecrets } from "../../lib/sanitize.mjs";
 
 // この action のディレクトリ（sandbox-runtime/ の版の固定を読む）
 const HERE = dirname(fileURLToPath(import.meta.url));
+/** レビューの工程に渡す差分の上限（文字数）。超えたら判定が決まらないとして止める */
+const REVIEW_DIFF_MAX = 200000;
 
 // ---------- 既定値 ----------
 
@@ -539,9 +541,11 @@ async function implementLoop(ctx, { prev, criteria, planText, title, isTest, res
 
     // レビュー
     const diff = (await ctx.git(["diff", "--no-ext-diff", "--no-textconv", ctx.reviewBase, sha])).out;
+    // 切った差分をレビューさせると、切った先の変更を見ずに承認しうる。渡しきれない大きさなら止める
+    if (diff.length > REVIEW_DIFF_MAX) throw new Stop("undecidable", `差分が ${diff.length} 文字あり、レビューに渡せる上限（${REVIEW_DIFF_MAX} 文字）を超えた`);
     const rev = await callStage(ctx, "review", buildPrompt("review", {
       trusted: [criteria, ["ゲートの結果", "テストの凍結、lint、型検査、テスト、既存のテストだけの木を、全部通った"]],
-      untrusted: [["previous_findings", JSON.stringify(lastFindings, null, 2)], ["diff", truncate(diff, 200000)]],
+      untrusted: [["previous_findings", JSON.stringify(lastFindings, null, 2)], ["diff", diff]],
     }));
     await resetTree(ctx, sha); // レビューの工程は読むだけ
     const mustFix = rev.findings.filter((f) => f.severity === "must_fix" && f.status !== "resolved");
@@ -585,10 +589,6 @@ async function implementLoop(ctx, { prev, criteria, planText, title, isTest, res
     stage = "fix";
     prev = sha;
   }
-}
-
-function truncate(s, n) {
-  return s.length > n ? `${s.slice(0, n)}\n…（長いので切った）` : s;
 }
 
 /** 続きから進める: PR のブランチに土台のコミットを取り込み、ゲート → レビュー → 修正 */
@@ -806,7 +806,7 @@ async function modeWork() {
   const git = makeGit(ws);
   let progressId = null;
   const progress = async (text) => {
-    const body = `作業の進捗（${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC）: ${text}\n\n実行のログ: ${runUrl()}\n\n${marker("progress")}`;
+    const body = `作業の進捗（${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC）: ${scrubSecrets(text, secrets)}\n\n実行のログ: ${runUrl()}\n\n${marker("progress")}`;
     try {
       if (progressId) await gh.patch(`/repos/${repoFromEnv().full}/issues/comments/${progressId}`, { body });
       else progressId = (await comment(gh, issue, body)).id;
@@ -881,6 +881,9 @@ async function modeWork() {
       const headSkills = baseSkills(ws, (await git(["ls-files", "-z"])).out.split("\0").filter(Boolean));
       if (headSkills.excluded.length) log(`PR の先頭で許さないスキル: ${headSkills.excluded.join("、")}`);
       ctx.skills = ctx.skills.filter((n) => headSkills.allowed.includes(n));
+      // helper のコマンドも PR の先頭で確かめる ── Claude Code が読むのは、PR の先頭の設定のファイル
+      const headHelpers = findHelpers(ws);
+      if (headHelpers.length) throw new Stop("cannot_start", `PR の先頭の設定のファイルに helper のコマンドがある: ${headHelpers.join(", ")}`);
       ctx.start = resume.head_sha;
       ctx.reviewBase = base;
     }
@@ -921,7 +924,6 @@ async function modeWork() {
     await git(["update-ref", "-d", "refs/merge-while-you-sleep/bundle"]);
     setOutput("bundle_dir", bdir);
     setOutput("bundle_head", res.head);
-    setOutput("resume_pr_head", resume ? resume.head_sha : "");
     setOutput("automerge", res.automerge ? "true" : "false");
     setOutput("work_report", sanitizeReport(res.report, secrets));
     setOutput("submit", "true");

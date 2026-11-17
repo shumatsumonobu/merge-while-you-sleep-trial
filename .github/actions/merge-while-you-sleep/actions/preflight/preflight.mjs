@@ -12,7 +12,7 @@ import { labels, latestLabeledEvent, makeGitHub, permissionOf, readEvent, repoFr
 import { tokenSourceFromInputs } from "../../lib/pr-token.mjs";
 import { codeBlock, scrubSecrets, stripInvisible } from "../../lib/sanitize.mjs";
 
-const PREFLIGHT_PERMISSIONS = { contents: "write", pull_requests: "write", actions: "write", administration: "read" };
+const PREFLIGHT_PERMISSIONS = { contents: "write", pull_requests: "write", administration: "read" };
 
 // ---------- artifact の zip ----------
 

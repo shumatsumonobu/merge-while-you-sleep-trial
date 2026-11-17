@@ -48,7 +48,7 @@ export const DEFAULT_TEST_PATHS = [
 
 /** 変えさせないファイル（必ず外すファイルのうち、Claude Code の振る舞いとワークフローを決めるもの） */
 export const PROTECTED_PATHS = [
-  "**/.github/**", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/**", "**/.mcp.json",
+  "**/.github/**", "**/CODEOWNERS", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/**", "**/.mcp.json",
 ];
 
 /** 依存とスクリプトの定義 ── 続きから進めるときに、PR のブランチで変わっていたら人に引き継ぐ */
@@ -69,7 +69,6 @@ export const DEPENDENCY_PATHS = [
 /** 必ず外すファイル（どの階層にあっても外す。足せるが、減らせない）── docs/design/gates.md の自動マージの範囲 */
 export const FIXED_DENY_PATHS = [
   ...PROTECTED_PATHS,
-  "**/CODEOWNERS",
   // ほかのコーディングエージェントへの指示（Claude Code は読まないので、変えさせないファイルには入れない）
   "**/GEMINI.md",
   // テストの設定と、全部のテストに効くファイル

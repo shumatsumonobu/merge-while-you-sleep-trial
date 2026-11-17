@@ -15,7 +15,7 @@ inputs:
     required: false
     default: opus
   max_draft_questions:
-    description: 下書きの質問の上限
+    description: 質問を返した下書きの回数の上限（1回の下書きで質問が複数あっても1回）
     required: false
     default: "5"
   max_draft_minutes:

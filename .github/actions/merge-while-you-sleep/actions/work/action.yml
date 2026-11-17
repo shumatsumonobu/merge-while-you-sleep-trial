@@ -112,8 +112,6 @@ outputs:
     description: bundle を置いたディレクトリ（RUNNER_TEMP の下）
   bundle_head:
     description: bundle の先頭の SHA
-  resume_pr_head:
-    description: 続きから進めるときに、作業を始めた時点の PR の先頭
   automerge:
     description: 自動マージを予約してよいか
   work_report:

@@ -35,9 +35,6 @@ inputs:
   bundle_head:
     description: 作業のジョブの出力（bundle の先頭の SHA）
     required: true
-  resume_pr_head:
-    description: 作業のジョブの出力（続きから進めるときに、作業を始めた時点の PR の先頭）
-    required: false
   automerge:
     description: 作業のジョブの出力（自動マージを予約してよいか）
     required: false

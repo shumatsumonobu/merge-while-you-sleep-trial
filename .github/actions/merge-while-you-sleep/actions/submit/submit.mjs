@@ -141,8 +141,9 @@ async function modeSubmit() {
   const report = JSON.parse(input("work_report"));
   const base = input("base_commit");
   const head = input("bundle_head");
-  const prevHead = input("resume_pr_head");
   const resume = input("resume") ? JSON.parse(input("resume")) : null;
+  // 続きから進めるときの PR の先頭は、開始の確認が記録した値を使う。作業のジョブの出力は信じない
+  const prevHead = resume ? resume.head_sha : "";
   const automergeIn = inputBool("automerge", false);
   const bundle = input("bundle_path", join(process.env.RUNNER_TEMP || "/tmp", "merge-while-you-sleep-bundle", "work.bundle"));
   const issueN = approval.issue;
@@ -275,8 +276,16 @@ async function enableAutoMerge(pr, prNode, head, approval) {
       `mutation($id:ID!,$m:PullRequestMergeMethod!,$h:GitObjectID!,$t:String!,$b:String!){enablePullRequestAutoMerge(input:{pullRequestId:$id,mergeMethod:$m,expectedHeadOid:$h,commitHeadline:$t,commitBody:$b}){clientMutationId}}`,
       { id: prNode, m: method, h: head, t: headline, b: body },
     );
-  } catch {
-    // すでにマージできる状態だと予約できない（実装のときに確かめる）。そのときは、同じ先頭のコミットでマージする
+  } catch (e) {
+    // 必須のステータスチェックが全部通ってマージできる状態（CLEAN か HAS_HOOKS）だと、予約できない。そのときだけ、同じ先頭のコミットでマージする
+    // ほかの理由で予約できないときは、マージせずに止める ── 必須のチェックを待たずにマージする道を作らない
+    const st = await pr.graphql(
+      `query($id:ID!){node(id:$id){... on PullRequest{mergeStateStatus headRefOid}}}`,
+      { id: prNode },
+    ).catch(() => null);
+    if (!["CLEAN", "HAS_HOOKS"].includes(st?.node?.mergeStateStatus) || st.node.headRefOid !== head) {
+      throw new Halt("not_merged", `自動マージを予約できない（${String(e?.message || e).slice(0, 200)}）`);
+    }
     await pr.graphql(
       `mutation($id:ID!,$m:PullRequestMergeMethod!,$h:GitObjectID!,$t:String!,$b:String!){mergePullRequest(input:{pullRequestId:$id,mergeMethod:$m,expectedHeadOid:$h,commitHeadline:$t,commitBody:$b}){clientMutationId}}`,
       { id: prNode, m: method, h: head, t: headline, b: body },
