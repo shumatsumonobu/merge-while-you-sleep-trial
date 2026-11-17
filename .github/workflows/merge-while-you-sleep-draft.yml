@@ -1,6 +1,6 @@
 # 下書き用のワークフロー。.github/workflows/merge-while-you-sleep-draft.yml にコピーする
 #
-# ジョブは3つ: 下書き、順番待ちの通知、終わりの確認（DESIGN.md のワークフローのファイルとジョブ）
+# ジョブは3つ: 下書き、順番待ちの通知、終わりの確認（docs/design/run.md のワークフローのファイルとジョブ）
 # merge-while-you-sleep の @ のあとは、使う版のコミットの SHA に置き換える（供給元を固定する）
 
 name: merge-while-you-sleep-draft
@@ -61,7 +61,7 @@ jobs:
         with:
           persist-credentials: false
       - id: draft
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/draft@0aa8f3f4be626a744c3e1af092464ebedce2f725
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/draft@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       - if: steps.draft.outputs.artifact_dir != ''
@@ -84,7 +84,7 @@ jobs:
       issues: write
       actions: read
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/notify@0aa8f3f4be626a744c3e1af092464ebedce2f725
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/notify@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           run_workflow: merge-while-you-sleep-run.yml
 
@@ -96,7 +96,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/cleanup@0aa8f3f4be626a744c3e1af092464ebedce2f725
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/cleanup@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           target: draft
           needs: ${{ toJSON(needs) }}

@@ -1,6 +1,6 @@
 # 実行用のワークフロー。.github/workflows/merge-while-you-sleep-run.yml にコピーする
 #
-# ジョブは4つ: 開始の確認 → 作業 → 提出、終わりの確認（DESIGN.md のワークフローのファイルとジョブ）
+# ジョブは4つ: 開始の確認 → 作業 → 提出、終わりの確認（docs/design/run.md のワークフローのファイルとジョブ）
 # merge-while-you-sleep の @ のあとは、使う版のコミットの SHA に置き換える（供給元を固定する）
 # 作業のジョブの「プロジェクトごとの準備」と、テストのコマンドを、自分のプロジェクトに合わせて書き換える
 
@@ -56,7 +56,7 @@ jobs:
       resume: ${{ steps.preflight.outputs.resume }}
     steps:
       - id: preflight
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/preflight@0aa8f3f4be626a744c3e1af092464ebedce2f725
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/preflight@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           app_client_id: ${{ vars.APP_CLIENT_ID }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -69,13 +69,11 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
       actions: read
     outputs:
       done: ${{ steps.work.outputs.done }}
       submit: ${{ steps.work.outputs.submit }}
       bundle_head: ${{ steps.work.outputs.bundle_head }}
-      resume_pr_head: ${{ steps.work.outputs.resume_pr_head }}
       automerge: ${{ steps.work.outputs.automerge }}
       work_report: ${{ steps.work.outputs.work_report }}
     steps:
@@ -91,7 +89,7 @@ jobs:
       - run: npm ci
       # ---- ここまで ----
       - id: work
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/work@0aa8f3f4be626a744c3e1af092464ebedce2f725
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/work@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           test_command: npm test
@@ -131,7 +129,7 @@ jobs:
           name: merge-while-you-sleep-bundle
           path: ${{ runner.temp }}/merge-while-you-sleep-bundle
       - id: submit
-        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/submit@0aa8f3f4be626a744c3e1af092464ebedce2f725
+        uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/submit@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           app_client_id: ${{ vars.APP_CLIENT_ID }}
           app_private_key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -140,7 +138,6 @@ jobs:
           resume: ${{ needs.preflight.outputs.resume }}
           work_report: ${{ needs.work.outputs.work_report }}
           bundle_head: ${{ needs.work.outputs.bundle_head }}
-          resume_pr_head: ${{ needs.work.outputs.resume_pr_head }}
           automerge: ${{ needs.work.outputs.automerge }}
           bundle_path: ${{ runner.temp }}/merge-while-you-sleep-bundle/work.bundle
 
@@ -154,7 +151,7 @@ jobs:
       pull-requests: read
       actions: read
     steps:
-      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/cleanup@0aa8f3f4be626a744c3e1af092464ebedce2f725
+      - uses: shumatsumonobu/merge-while-you-sleep-trial/.github/actions/merge-while-you-sleep/actions/cleanup@63d764760df6220fb59819b101ace72ff0f31eb8
         with:
           target: run
           needs: ${{ toJSON(needs) }}
