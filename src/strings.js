@@ -280,3 +280,36 @@ export function wrapR(s, width) {
   lines.push(current);
   return lines.join("\n");
 }
+
+/**
+ * 文字列を width 文字以内の行に折り返す。空白の位置で折り、width より長い語は width ごとに切る。
+ * 続く空白は1つにまとめ、前後の空白は除く。行の区切りは "\n"。
+ * @param {string} s
+ * @param {number} width 1 以上の整数
+ * @returns {string}
+ * @throws {RangeError} width が 1 より小さいか整数でないとき
+ */
+export function foldLines(s, width) {
+  if (!Number.isInteger(width) || width < 1) {
+    throw new RangeError("width は 1 以上の整数にする");
+  }
+  const trimmed = s.trim();
+  if (trimmed === "") return "";
+  const lines = [];
+  let current = "";
+  for (const word of trimmed.split(/\s+/)) {
+    for (let i = 0; i < word.length; i += width) {
+      const piece = word.slice(i, i + width);
+      if (current === "") {
+        current = piece;
+      } else if (current.length + 1 + piece.length <= width) {
+        current += " " + piece;
+      } else {
+        lines.push(current);
+        current = piece;
+      }
+    }
+  }
+  lines.push(current);
+  return lines.join("\n");
+}
